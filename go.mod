@@ -6,7 +6,7 @@ require (
 	github.com/giantswarm/api-schema v0.7.1 // indirect
 	github.com/giantswarm/apiextensions/v3 v3.26.0
 	github.com/giantswarm/companyd-client-go v0.6.1
-	github.com/giantswarm/credentiald/v2 v2.0.1
+	github.com/giantswarm/credentiald/v2 v2.17.0
 	github.com/giantswarm/exporterkit v0.2.1
 	github.com/giantswarm/k8sclient/v5 v5.11.0
 	github.com/giantswarm/k8smetadata v0.3.0

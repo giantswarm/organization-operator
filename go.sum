@@ -173,8 +173,8 @@ github.com/giantswarm/cluster-api v0.3.13-gs h1:ZgOMYkSuM1KnRmdDkPTfYj8G+Bdn6K1+
 github.com/giantswarm/cluster-api v0.3.13-gs/go.mod h1:BCtzLFd2R77eDAvZGd5P1OlG38exdHlQietjFA/7u+0=
 github.com/giantswarm/companyd-client-go v0.6.1 h1:w0MTDHqRi/pAZwQgj5QEtwAffBgDqctSJmci/+yPEGI=
 github.com/giantswarm/companyd-client-go v0.6.1/go.mod h1:wwGHUvHpVNp9nEKjgMzO4mYoBqjp+GZMvLzoGQOMU0w=
-github.com/giantswarm/credentiald/v2 v2.0.1 h1:c4rXDMnXdN4zb0Vw+JYYKslMaJgMRX8B2mtrr6haLM4=
-github.com/giantswarm/credentiald/v2 v2.0.1/go.mod h1:DLQAKGE8luFoN82cq13UbwAPhJ3KP2tFIy2Eun14Nro=
+github.com/giantswarm/credentiald/v2 v2.17.0 h1:H/SkZ9a5MkVGvDddwV7qAG637Gi84clUdLIJiZzqm/c=
+github.com/giantswarm/credentiald/v2 v2.17.0/go.mod h1:102chrpX8IvV8/umx9CVoudTprrITWfNjunlQOY3avw=
 github.com/giantswarm/exporterkit v0.2.0/go.mod h1:b4fuHVjsvZgznC9OEPfn0y5zvN8SnEKTiI5zTTfck94=
 github.com/giantswarm/exporterkit v0.2.1 h1:M/Avqdg6O+NdyGtY+LSy5cCpJzhG15WRHQRkhOY/dKs=
 github.com/giantswarm/exporterkit v0.2.1/go.mod h1:LkZNK+2qTcbHspbizA6JBBXpQW99u7u7UisUaWrSoVY=
