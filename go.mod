@@ -15,15 +15,15 @@ require (
 	github.com/giantswarm/microkit v0.2.2
 	github.com/giantswarm/micrologger v0.5.0
 	github.com/giantswarm/operatorkit/v5 v5.0.0
-	github.com/golang/mock v1.3.1
-	github.com/prometheus/client_golang v1.10.0
+	github.com/golang/mock v1.4.1
+	github.com/prometheus/client_golang v1.11.0
 	github.com/spf13/viper v1.7.1
 	gopkg.in/resty.v1 v1.12.0
-	k8s.io/api v0.18.19
-	k8s.io/apiextensions-apiserver v0.18.19
-	k8s.io/apimachinery v0.18.19
-	k8s.io/client-go v0.18.19
-	sigs.k8s.io/controller-runtime v0.6.4
+	k8s.io/api v0.21.2
+	k8s.io/apiextensions-apiserver v0.21.2
+	k8s.io/apimachinery v0.21.2
+	k8s.io/client-go v0.21.2
+	sigs.k8s.io/controller-runtime v0.9.2
 )
 
 replace (
