@@ -15,7 +15,7 @@ require (
 	github.com/giantswarm/microkit v0.2.2
 	github.com/giantswarm/micrologger v0.5.0
 	github.com/giantswarm/operatorkit/v5 v5.0.0
-	github.com/golang/mock v1.3.1
+	github.com/golang/mock v1.6.0
 	github.com/prometheus/client_golang v1.10.0
 	github.com/spf13/viper v1.7.1
 	gopkg.in/resty.v1 v1.12.0
