@@ -1,0 +1,9 @@
+apiVersion: security.giantswarm.io/v1alpha1
+kind: Organization
+metadata:
+  labels:
+    app.kubernetes.io/name: organization-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: organization-sample
+spec:
+  # TODO(user): Add fields here

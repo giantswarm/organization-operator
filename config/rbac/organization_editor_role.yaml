@@ -1,0 +1,27 @@
+# permissions for end users to edit organizations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: organization-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: organization-editor-role
+rules:
+- apiGroups:
+  - security.giantswarm.io
+  resources:
+  - organizations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - security.giantswarm.io
+  resources:
+  - organizations/status
+  verbs:
+  - get

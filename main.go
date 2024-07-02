@@ -1,124 +1,86 @@
 package main
 
 import (
-	"context"
-	"time"
+	"flag"
+	"os"
 
-	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/microkit/command"
-	microserver "github.com/giantswarm/microkit/server"
-	"github.com/giantswarm/micrologger"
-	"github.com/spf13/viper"
+	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
+	// to ensure that exec-entrypoint and run can make use of them.
 
-	"github.com/giantswarm/organization-operator/flag"
-	"github.com/giantswarm/organization-operator/pkg/project"
-	"github.com/giantswarm/organization-operator/server"
-	"github.com/giantswarm/organization-operator/service"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	securityv1alpha1 "github.com/giantswarm/organization-operator/api/v1alpha1"
+	"github.com/giantswarm/organization-operator/controllers"
+	//+kubebuilder:scaffold:imports
 )
 
 var (
-	f *flag.Flag = flag.New()
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
 )
 
-func main() {
-	err := mainE(context.Background())
-	if err != nil {
-		panic(microerror.JSON(err))
-	}
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(securityv1alpha1.AddToScheme(scheme))
+	//+kubebuilder:scaffold:scheme
 }
 
-func mainE(ctx context.Context) error {
-	var err error
-
-	var logger micrologger.Logger
-	{
-		c := micrologger.Config{}
-
-		logger, err = micrologger.New(c)
-		if err != nil {
-			return microerror.Mask(err)
-		}
+func main() {
+	var metricsAddr string
+	var enableLeaderElection bool
+	var probeAddr string
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
+	opts := zap.Options{
+		Development: true,
 	}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
 
-	// We define a server factory to create the custom server once all command
-	// line flags are parsed and all microservice configuration is storted out.
-	serverFactory := func(v *viper.Viper) microserver.Server {
-		// Create a new custom service which implements business logic.
-		var newService *service.Service
-		{
-			c := service.Config{
-				Logger: logger,
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-				Flag:  f,
-				Viper: v,
-			}
-
-			newService, err = service.New(c)
-			if err != nil {
-				panic(microerror.JSON(err))
-			}
-
-			go newService.Boot(ctx)
-		}
-
-		// Create a new custom server which bundles our endpoints.
-		var newServer microserver.Server
-		{
-			c := server.Config{
-				Logger:  logger,
-				Service: newService,
-
-				Viper: v,
-			}
-
-			newServer, err = server.New(c)
-			if err != nil {
-				panic(microerror.JSON(err))
-			}
-		}
-
-		return newServer
-	}
-
-	// Create a new microkit command which manages our custom microservice.
-	var newCommand command.Command
-	{
-		c := command.Config{
-			Logger:        logger,
-			ServerFactory: serverFactory,
-
-			Description: project.Description(),
-			GitCommit:   project.GitSHA(),
-			Name:        project.Name(),
-			Source:      project.Source(),
-			Version:     project.Version(),
-		}
-
-		newCommand, err = command.New(c)
-		if err != nil {
-			return microerror.Mask(err)
-		}
-	}
-
-	daemonCommand := newCommand.DaemonCommand().CobraCommand()
-
-	daemonCommand.PersistentFlags().String(f.Service.Kubernetes.Address, "http://127.0.0.1:6443", "Address used to connect to Kubernetes. When empty in-cluster config is created.")
-	daemonCommand.PersistentFlags().Bool(f.Service.Kubernetes.InCluster, false, "Whether to use the in-cluster config to authenticate with Kubernetes.")
-	daemonCommand.PersistentFlags().String(f.Service.Kubernetes.KubeConfig, "", "KubeConfig used to connect to Kubernetes. When empty other settings are used.")
-	daemonCommand.PersistentFlags().String(f.Service.Kubernetes.TLS.CAFile, "", "Certificate authority file path to use to authenticate with Kubernetes.")
-	daemonCommand.PersistentFlags().String(f.Service.Kubernetes.TLS.CrtFile, "", "Certificate file path to use to authenticate with Kubernetes.")
-	daemonCommand.PersistentFlags().String(f.Service.Kubernetes.TLS.KeyFile, "", "Key file path to use to authenticate with Kubernetes.")
-
-	daemonCommand.PersistentFlags().String(f.Service.LegacyOrganizations.Address, "", "The address of the companyd service.")
-	daemonCommand.PersistentFlags().String(f.Service.LegacyCredentials.Address, "", "The address of the credentiald service.")
-
-	defaultDuration, _ := time.ParseDuration("5m")
-	daemonCommand.PersistentFlags().Duration(f.Service.ResyncPeriod, defaultDuration, "The time between reconcile loops.")
-
-	err = newCommand.CobraCommand().Execute()
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:                 scheme,
+		HealthProbeBindAddress: probeAddr,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "d910d25f.giantswarm.io",
+	})
 	if err != nil {
-		return microerror.Mask(err)
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
 	}
 
-	return nil
+	if err = (&controllers.OrganizationReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("Organization"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Organization")
+		os.Exit(1)
+	}
+	//+kubebuilder:scaffold:builder
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
 }
