@@ -18,12 +18,14 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,10 +46,6 @@ var _ = Describe("Organization controller", func() {
 
 			By("Creating the first organization")
 			org1 := &securityv1alpha1.Organization{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "security.giantswarm.io/v1alpha1",
-					Kind:       "Organization",
-				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-1",
 				},
@@ -116,15 +114,29 @@ var _ = Describe("Organization controller", func() {
 			By("Deleting the first organization")
 			Expect(k8sClient.Delete(ctx, org1)).Should(Succeed())
 
-			_, err = reconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: types.NamespacedName{Name: "test-1"},
-			})
-			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() error {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: "test-1"}, &securityv1alpha1.Organization{})
+				if errors.IsNotFound(err) {
+					return nil
+				}
+				if err != nil {
+					return err
+				}
+				// Trigger reconciliation if the organization still exists
+				_, reconcileErr := reconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: types.NamespacedName{Name: "test-1"},
+				})
+				if reconcileErr != nil {
+					return reconcileErr
+				}
+				return fmt.Errorf("organization still exists")
+			}, timeout, interval).Should(Succeed())
 
 			By("Verifying the total organizations metric is back to 1")
 			Eventually(func() float64 {
 				return testutil.ToFloat64(organizationsTotal)
 			}, timeout, interval).Should(Equal(float64(1)))
 		})
+
 	})
 })
