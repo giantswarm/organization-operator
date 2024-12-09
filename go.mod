@@ -107,7 +107,7 @@ replace (
 	github.com/labstack/echo/v4 => github.com/labstack/echo/v4 v4.12.0
 	github.com/microcosm-cc/bluemonday => github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.10.22
-	github.com/valyala/fasthttp => github.com/valyala/fasthttp v1.57.0
+	github.com/valyala/fasthttp => github.com/valyala/fasthttp v1.58.0
 	go.mongodb.org/mongo-driver => go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/text => golang.org/x/text v0.20.0
 )
