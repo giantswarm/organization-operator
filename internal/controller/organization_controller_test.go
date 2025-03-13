@@ -135,7 +135,7 @@ var _ = Describe("Organization controller", func() {
 			org := &securityv1alpha1.Organization{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-finalizer",
-					Finalizers: []string{"organization.giantswarm.io/finalizer"},
+					Finalizers: []string{newFinalizer},
 				},
 				Spec: securityv1alpha1.OrganizationSpec{},
 				Status: securityv1alpha1.OrganizationStatus{
@@ -200,7 +200,7 @@ var _ = Describe("Organization controller", func() {
 			oldFinalizerOrg := &securityv1alpha1.Organization{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "test-old-finalizer",
-					Finalizers: []string{"operatorkit.giantswarm.io/organization-operator-organization-controller"},
+					Finalizers: []string{oldFinalizer},
 				},
 				Spec: securityv1alpha1.OrganizationSpec{},
 				Status: securityv1alpha1.OrganizationStatus{

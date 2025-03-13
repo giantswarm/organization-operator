@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	securityv1alpha1 "github.com/giantswarm/organization-operator/api/v1alpha1"
 )
@@ -59,7 +60,7 @@ type OrganizationReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *OrganizationReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	logger := log.FromContext(ctx)
 
 	// Fetch the Organization instance
@@ -129,7 +130,7 @@ func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *OrganizationReconciler) reconcileDelete(ctx context.Context, organization *securityv1alpha1.Organization) (ctrl.Result, error) {
+func (r *OrganizationReconciler) reconcileDelete(ctx context.Context, organization *securityv1alpha1.Organization) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 
 	// Use the namespace name from the organization status
