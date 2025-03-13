@@ -1,8 +1,6 @@
 module github.com/giantswarm/organization-operator
 
-go 1.22.0
-
-toolchain go1.23.3
+go 1.24.0
 
 require (
 	github.com/onsi/ginkgo/v2 v2.22.0
