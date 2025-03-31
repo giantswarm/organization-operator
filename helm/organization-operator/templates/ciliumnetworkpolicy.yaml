@@ -3,7 +3,7 @@ apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: {{ .Values.name }}
+  name: {{ .Release.Name }}
   labels:
     {{- include "labels.common" . | nindent 4 }}
 spec:
