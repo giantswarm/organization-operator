@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: {{ include "resource.default.name"  . }}
   namespace: {{ include "resource.default.namespace"  . }}
-  labels: 
+  labels:
     {{ - include "labels.common" . | nindent 4 }}
 spec:
   ports:
@@ -17,6 +17,5 @@ spec:
       targetPort: 8080
   selector: 
     {{ - include "labels.selector" . | nindent 4 }}
-
 
 
