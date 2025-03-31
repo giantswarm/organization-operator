@@ -11,7 +11,10 @@ spec:
       protocol: TCP
       targetPort: http
     - name: metrics
-      port: 8080
+      port: {{ .Values.ports.metrics | quote }}
       protocol: TCP
-      targetPort: {{ .Values.ports.metrics | quote }}
-  selector: {{ - include "labels.selector" . | nindent 4 }}
+      targetPort: 8080
+  selector: 
+    {{ - include "labels.selector" . | nindent 4 }}
+
+
