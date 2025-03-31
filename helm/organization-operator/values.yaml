@@ -33,3 +33,7 @@ global:
 # Metrics port
 ports:
   metrics: 8080
+
+ciliumNetworkPolicy:
+  enabled: true
+
