@@ -3,8 +3,7 @@ kind: Service
 metadata:
   name: {{ include "resource.default.name"  . }}
   namespace: {{ include "resource.default.namespace"  . }}
-  labels:
-    {{ - include "labels.common" . | nindent 4 }}
+  labels: {{- include "labels.common" . | nindent 4 }}
 spec:
   ports:
     - name: http
@@ -12,9 +11,7 @@ spec:
       protocol: TCP
       targetPort: http
     - name: metrics
-      port: {{ .Values.ports.metrics | quote }}
+      port: {{ .Values.ports.metrics }}
       protocol: TCP
       targetPort: 8080
-  selector: 
-    {{ - include "labels.selector" . | nindent 4 }}
-
+  selector: {{- include "labels.selector" . | nindent 4 }}
