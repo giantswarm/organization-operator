@@ -20,6 +20,6 @@ spec:
           app.kubernetes.io/name: alloy
       toPorts:
       - ports:
-        - port: {{ .Values.metrics | quote }}
+        - port: {{ .Values.ports.metrics | quote }}
           protocol: TCP
 {{ end }}
