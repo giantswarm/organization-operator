@@ -18,4 +18,3 @@ spec:
   selector: 
     {{ - include "labels.selector" . | nindent 4 }}
 
-
