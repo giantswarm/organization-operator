@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: { { include "resource.default.name"  . } }
-  namespace: { { include "resource.default.namespace"  . } }
-  labels: { { - include "labels.common" . | nindent 4 } }
+  name: {{ include "resource.default.name"  . }}
+  namespace: {{ include "resource.default.namespace"  . }}
+  labels: {{ - include "labels.common" . | nindent 4 }}
 spec:
   ports:
     - name: http
@@ -13,5 +13,5 @@ spec:
     - name: metrics
       port: 8080
       protocol: TCP
-      targetPort: { { .Values.metrics | quote } }
-  selector: { { - include "labels.selector" . | nindent 4 } }
+      targetPort: {{ .Values.ports.metrics | quote }}
+  selector: {{ - include "labels.selector" . | nindent 4 }}
