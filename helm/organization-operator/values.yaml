@@ -35,4 +35,4 @@ ports:
   metrics: 8080
 
 ciliumNetworkPolicy:
-  enabled: true
+  enabled: false
