@@ -95,7 +95,7 @@ func main() {
 			BindAddress:    metricsAddr,
 			SecureServing:  secureMetrics,
 			TLSOpts:        tlsOpts,
-			FilterProvider: filters.WithAuthenticationAndAuthorization,
+			// FilterProvider: filters.WithAuthenticationAndAuthorization,
 		},
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
