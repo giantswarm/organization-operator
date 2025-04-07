@@ -59,7 +59,7 @@ spec:
       - name: {{ include "name" . }}
         image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Chart.AppVersion }}"
         args:
-        - --metrics-bind-address={{ .Values.ports.metrics }}
+        - --metrics-bind-address=:{{ .Values.ports.metrics }}
         {{- if .Values.serviceMonitor.tls.enabled }}
         - --metrics-secure=true
         - --metrics-cert-path=/tmp/k8s-metrics/metrics-certs
