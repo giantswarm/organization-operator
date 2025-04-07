@@ -12,6 +12,15 @@ spec:
       path: /metrics
       port: metrics
       scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+      {{- if .Values.serviceMonitor.tls.enabled }}
+      scheme: https
+      tlsConfig:
+        ca:
+          secret:
+            name: {{ .Values.serviceMonitor.tls.secretName }}
+            key: ca.crt
+        serverName: {{ include "resource.default.name"  . }}
+      {{- end }}
   selector:
     matchLabels:
       {{- include "labels.selector" . | nindent 6 }}
