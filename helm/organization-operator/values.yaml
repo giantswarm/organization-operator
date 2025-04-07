@@ -26,6 +26,14 @@ serviceMonitor:
   # -- (duration) Prometheus scrape timeout.
   scrapeTimeout: "45s"
 
+  tls:
+    # --- (boolean) Whether scrape connections should use TLS.
+    enabled: true
+    # --- (string) The name of the issuer to use to create the TLS certificate.
+    issuerName: selfsigned-giantswarm
+    # --- (string) The name of the secret that contains the TLS certificate and private key.
+    secretName: organization-operator-tls
+
 global:
   podSecurityStandards:
     enforced: false

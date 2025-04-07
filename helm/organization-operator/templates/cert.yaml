@@ -1,0 +1,25 @@
+{{- if .Values.serviceMonitor.tls.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "resource.default.name"  . }}-tls-cert
+  namespace: {{ include "resource.default.namespace"  . }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.serviceMonitor.tls.secretName }}
+  privateKey:
+    algorithm: ECDSA
+    size: 384
+  dnsNames:
+    - '*.{{ include "resource.default.name"  . }}.{{ include "resource.default.namespace"  . }}.svc.cluster.local'
+    - '*.{{ include "resource.default.name"  . }}.{{ include "resource.default.namespace"  . }}.svc.local'
+    - '*.{{ include "resource.default.name"  . }}.{{ include "resource.default.namespace"  . }}.svc'
+    - '*.{{ include "resource.default.name"  . }}.{{ include "resource.default.namespace"  . }}'
+    - '*.{{ include "resource.default.name"  . }}'
+    - '{{ include "resource.default.name"  . }}'
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: {{ .Values.serviceMonitor.tls.issuerName }}
+{{- end }}
