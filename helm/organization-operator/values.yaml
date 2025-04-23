@@ -1,13 +1,19 @@
 image:
   name: "giantswarm/organization-operator"
+
+registry:
+  domain: gsoci.azurecr.io
+
 pod:
   user:
     id: 1000
   group:
     id: 1000
+  ports:
+    http: 8000
+    metrics: 8080
+
 resyncPeriod: "5m"
-registry:
-  domain: gsoci.azurecr.io
 
 # Add seccomp to pod security context
 podSecurityContext:
@@ -51,6 +57,3 @@ global:
 # Metrics port
 ports:
   metrics: 8080
-
-ciliumNetworkPolicy:
-  enabled: false

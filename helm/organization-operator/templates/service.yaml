@@ -8,12 +8,12 @@ metadata:
 spec:
   ports:
     - name: http
-      port: 8000
+      port: {{ .Values.pod.ports.http }}
       protocol: TCP
       targetPort: http
     - name: metrics
-      port: {{ .Values.ports.metrics }}
+      port: {{ .Values.pod.ports.metrics }}
       protocol: TCP
-      targetPort: 8080
+      targetPort: metrics
   selector:
     {{- include "labels.selector" . | nindent 4 }}

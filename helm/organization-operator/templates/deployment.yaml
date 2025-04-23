@@ -59,14 +59,17 @@ spec:
       - name: {{ include "name" . }}
         image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Chart.AppVersion }}"
         args:
-        - --metrics-bind-address=:{{ .Values.ports.metrics }}
+        - --metrics-bind-address=:{{ .Values.pod.ports.metrics }}
         {{- if .Values.serviceMonitor.tls.enabled }}
         - --metrics-secure=true
         - --metrics-cert-path=/tmp/k8s-metrics/metrics-certs
         {{- end }}
         ports:
-        - containerPort: 8000
+        - containerPort: {{ .Values.pod.ports.http }}
           name: http
+          protocol: TCP
+        - containerPort: {{ .Values.pod.ports.metrics }}
+          name: metrics
           protocol: TCP
         volumeMounts:
         - name: {{ include "name" . }}-configmap

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add Cilium Network Policy to Organization operator
+- Enable TLS and authentication for metrics endpoint.
 
 ### Changed
 
