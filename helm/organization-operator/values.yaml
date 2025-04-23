@@ -26,6 +26,10 @@ serviceMonitor:
   # -- (duration) Prometheus scrape timeout.
   scrapeTimeout: "45s"
 
+  scrapeAuth:
+    # -- (boolean) Whether scrape requests to the metrics endpoint must authenticate first.
+    enabled: true
+
   tls:
     # --- (boolean) Whether scrape connections should use TLS.
     enabled: true
