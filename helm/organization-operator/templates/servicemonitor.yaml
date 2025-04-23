@@ -12,6 +12,7 @@ spec:
       path: /metrics
       port: metrics
       scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       {{- if .Values.serviceMonitor.tls.enabled }}
       scheme: https
       tlsConfig:
