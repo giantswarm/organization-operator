@@ -18,3 +18,14 @@ room for such suffix.
 {{- define "resource.psp.name" -}}
 {{- include "resource.default.name" . -}}-psp
 {{- end -}}
+
+{{/*
+Allow naming a pre-existing ServiceAccount for metrics, or generate one from this chart.
+*/}}
+{{- define "resource.metricsServiceAccount.name" -}}
+{{- if .Values.serviceMonitor.scrapeAuth.serviceAccountName }}
+{{- .Values.serviceMonitor.scrapeAuth.serviceAccountName }}
+{{- else }}
+{{- include "resource.default.name" . -}}-metrics-scrape
+{{- end }}
+{{- end }}

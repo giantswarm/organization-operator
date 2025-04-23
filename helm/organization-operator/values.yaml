@@ -30,6 +30,12 @@ serviceMonitor:
     # -- (boolean) Whether scrape requests to the metrics endpoint must authenticate first.
     enabled: true
 
+    # -- (string) The name of the new or existing service account to use for authentication.
+    serviceAccountName: ""
+
+    # -- (boolean) Whether this chart should create the service account for scraping metrics.
+    createServiceAccount: true
+
   tls:
     # --- (boolean) Whether scrape connections should use TLS.
     enabled: true
