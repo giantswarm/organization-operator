@@ -12,7 +12,12 @@ spec:
       path: /metrics
       port: metrics
       scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
-      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      # bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ include "resource.metricsServiceAccount.name"  . }}
+          key: token
       {{- if .Values.serviceMonitor.tls.enabled }}
       scheme: https
       tlsConfig:
