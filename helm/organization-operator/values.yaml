@@ -53,7 +53,3 @@ serviceMonitor:
 global:
   podSecurityStandards:
     enforced: false
-
-# Metrics port
-ports:
-  metrics: 8080
