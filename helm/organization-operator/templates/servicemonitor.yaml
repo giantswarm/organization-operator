@@ -12,13 +12,6 @@ spec:
       path: /metrics
       port: metrics
       scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
-      {{- if .Values.serviceMonitor.scrapeAuth.enabled }}
-      authorization:
-        type: Bearer
-        credentials:
-          name: {{ include "resource.metricsServiceAccount.name"  . }}
-          key: token
-      {{- end }}
       {{- if .Values.serviceMonitor.tls.enabled }}
       scheme: https
       tlsConfig:
@@ -27,6 +20,13 @@ spec:
             name: {{ .Values.serviceMonitor.tls.secretName }}
             key: ca.crt
         serverName: {{ include "resource.default.name"  . }}
+      {{- if .Values.serviceMonitor.scrapeAuth.enabled }}
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ include "resource.metricsServiceAccount.name"  . }}
+          key: token
+      {{- end }}
       {{- end }}
   selector:
     matchLabels:
