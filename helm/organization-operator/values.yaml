@@ -1,13 +1,17 @@
 image:
   name: "giantswarm/organization-operator"
+
+registry:
+  domain: gsoci.azurecr.io
+
 pod:
   user:
     id: 1000
   group:
     id: 1000
-resyncPeriod: "5m"
-registry:
-  domain: gsoci.azurecr.io
+  ports:
+    http: 8000
+    metrics: 8080
 
 # Add seccomp to pod security context
 podSecurityContext:
@@ -25,6 +29,29 @@ serviceMonitor:
   interval: "60s"
   # -- (duration) Prometheus scrape timeout.
   scrapeTimeout: "45s"
+
+  scrapeAuth:
+    # -- (boolean) Whether scrape requests to the metrics endpoint must authenticate first. Requires TLS to be enabled.
+    enabled: true
+
+    # -- (string) The name of the new or existing service account to use for authentication.
+    serviceAccountName: ""
+
+    # -- (boolean) Whether this chart should create the service account for scraping metrics.
+    createServiceAccount: true
+
+  tls:
+    # --- (boolean) Whether scrape connections should use TLS.
+    enabled: true
+
+    # --- (boolean) Whether this chart should create the TLS certificate used by the metrics endpoint. Assumes cert-manager is installed.
+    createServingCert: true
+
+    # --- (string) The name of the issuer to use to create the TLS certificate.
+    issuerName: selfsigned-giantswarm
+
+    # --- (string) The name of the secret that contains the TLS certificate and private key.
+    secretName: organization-operator-tls
 
 global:
   podSecurityStandards:

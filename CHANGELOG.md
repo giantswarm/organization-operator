@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Enable TLS and authentication for metrics endpoint.
+
 ### Changed
 
 - `golang` version updated to `1.24`
+
+### Removed
+
+- Remove unused code left over from migration to kubebuilder.
 
 ## [2.0.2] - 2024-10-17
 

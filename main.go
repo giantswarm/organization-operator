@@ -57,6 +57,7 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	var secureMetrics bool
+	var metricsCertPath string
 	var enableHTTP2 bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8000", "The address the probe endpoint binds to.")
@@ -65,6 +66,8 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&secureMetrics, "metrics-secure", false,
 		"If set, the metrics endpoint is served securely via HTTPS.")
+	flag.StringVar(&metricsCertPath, "metrics-cert-path", "/tmp/k8s-metrics/metrics-certs",
+		"Path to the directory containing TLS certificate data to be used by the metrics endpoint.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	opts := zap.Options{
@@ -94,6 +97,7 @@ func main() {
 		Metrics: metricsserver.Options{
 			BindAddress:    metricsAddr,
 			SecureServing:  secureMetrics,
+			CertDir:        metricsCertPath,
 			TLSOpts:        tlsOpts,
 			FilterProvider: filters.WithAuthenticationAndAuthorization,
 		},
