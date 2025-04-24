@@ -70,7 +70,7 @@ require (
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sync v0.9.0 // indirect
+	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
@@ -107,7 +107,7 @@ replace (
 	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.10.22
 	github.com/valyala/fasthttp => github.com/valyala/fasthttp v1.57.0
 	go.mongodb.org/mongo-driver => go.mongodb.org/mongo-driver v1.17.1
-	golang.org/x/text => golang.org/x/text v0.20.0
+	golang.org/x/text => golang.org/x/text v0.24.0
 )
 
 replace golang.org/x/net v0.33.0 => golang.org/x/net v0.38.0
