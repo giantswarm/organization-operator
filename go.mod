@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
-	github.com/prometheus/client_golang v1.21.1
+	github.com/prometheus/client_golang v1.22.0
 	k8s.io/api v0.33.0
 	k8s.io/apimachinery v0.33.0
 	k8s.io/client-go v0.33.0
@@ -45,7 +45,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -105,12 +104,12 @@ replace (
 	github.com/coreos/etcd v3.3.13+incompatible => github.com/coreos/etcd v3.3.25+incompatible
 	github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.10.0
-	github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.31.2
-	github.com/labstack/echo/v4 => github.com/labstack/echo/v4 v4.12.0
+	github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.0
+	github.com/labstack/echo/v4 => github.com/labstack/echo/v4 v4.13.3
 	github.com/microcosm-cc/bluemonday => github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.11.1
 	github.com/valyala/fasthttp => github.com/valyala/fasthttp v1.61.0
-	go.mongodb.org/mongo-driver => go.mongodb.org/mongo-driver v1.17.1
+	go.mongodb.org/mongo-driver => go.mongodb.org/mongo-driver v1.17.3
 	golang.org/x/text => golang.org/x/text v0.24.0
 )
 
