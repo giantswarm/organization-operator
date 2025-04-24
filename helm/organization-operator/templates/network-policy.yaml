@@ -11,9 +11,9 @@ spec:
       {{- include "labels.selector" . | nindent 6 }}
   ingress:
   - ports:
-    - port: 8000
+    - port: {{ .Values.pod.ports.http }}
       protocol: TCP
-    - port: 8080
+    - port: {{ .Values.pod.ports.metrics }}
       protocol: TCP
   egress:
   - {}

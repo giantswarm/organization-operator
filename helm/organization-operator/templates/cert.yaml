@@ -1,4 +1,4 @@
-{{- if .Values.serviceMonitor.tls.enabled }}
+{{- if and .Values.serviceMonitor.tls.enabled .Values.serviceMonitor.tls.createServingCert }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

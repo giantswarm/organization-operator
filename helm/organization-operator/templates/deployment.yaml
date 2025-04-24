@@ -28,14 +28,8 @@ spec:
                   {{- include "labels.selector" . | nindent 18 }}
               topologyKey: kubernetes.io/hostname
             weight: 100
-      volumes:
-      - name: {{ include "name" . }}-configmap
-        configMap:
-          name: {{ include "resource.default.name"  . }}
-          items:
-          - key: config.yml
-            path: config.yml
       {{- if .Values.serviceMonitor.tls.enabled }}
+      volumes:
       - name: metrics-certs
         secret:
           secretName: {{ .Values.serviceMonitor.tls.secretName }}
@@ -61,8 +55,10 @@ spec:
         args:
         - --metrics-bind-address=:{{ .Values.pod.ports.metrics }}
         {{- if .Values.serviceMonitor.tls.enabled }}
-        - --metrics-secure=true
         - --metrics-cert-path=/tmp/k8s-metrics/metrics-certs
+        {{- if .Values.serviceMonitor.scrapeAuth.enabled }}
+        - --metrics-secure=true
+        {{- end }}
         {{- end }}
         ports:
         - containerPort: {{ .Values.pod.ports.http }}
@@ -71,10 +67,8 @@ spec:
         - containerPort: {{ .Values.pod.ports.metrics }}
           name: metrics
           protocol: TCP
-        volumeMounts:
-        - name: {{ include "name" . }}-configmap
-          mountPath: /var/run/{{ include "name" . }}/configmap/
         {{- if .Values.serviceMonitor.tls.enabled }}
+        volumeMounts:
         - name: metrics-certs
           mountPath: /tmp/k8s-metrics/metrics-certs
           readOnly: true
