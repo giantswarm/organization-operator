@@ -99,7 +99,7 @@ require (
 replace (
 	github.com/coreos/etcd v3.3.10+incompatible => github.com/coreos/etcd v3.3.25+incompatible
 	github.com/coreos/etcd v3.3.13+incompatible => github.com/coreos/etcd v3.3.25+incompatible
-	github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.10.0
 	github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.31.2
 	github.com/labstack/echo/v4 => github.com/labstack/echo/v4 v4.12.0
