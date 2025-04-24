@@ -13,8 +13,6 @@ pod:
     http: 8000
     metrics: 8080
 
-resyncPeriod: "5m"
-
 # Add seccomp to pod security context
 podSecurityContext:
   seccompProfile:
