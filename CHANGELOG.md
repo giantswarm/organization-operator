@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `golang` version updated to `1.24`
+- Update go dependencies.
 
 ### Removed
 
