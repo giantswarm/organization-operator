@@ -98,19 +98,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
-
-replace (
-	github.com/coreos/etcd v3.3.10+incompatible => github.com/coreos/etcd v3.3.25+incompatible
-	github.com/coreos/etcd v3.3.13+incompatible => github.com/coreos/etcd v3.3.25+incompatible
-	github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v5 v5.2.2
-	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.10.0
-	github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.0
-	github.com/labstack/echo/v4 => github.com/labstack/echo/v4 v4.13.3
-	github.com/microcosm-cc/bluemonday => github.com/microcosm-cc/bluemonday v1.0.27
-	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.11.1
-	github.com/valyala/fasthttp => github.com/valyala/fasthttp v1.61.0
-	go.mongodb.org/mongo-driver => go.mongodb.org/mongo-driver v1.17.3
-	golang.org/x/text => golang.org/x/text v0.24.0
-)
-
-replace golang.org/x/net v0.33.0 => golang.org/x/net v0.38.0
