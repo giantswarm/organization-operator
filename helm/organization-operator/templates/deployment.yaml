@@ -28,13 +28,20 @@ spec:
                   {{- include "labels.selector" . | nindent 18 }}
               topologyKey: kubernetes.io/hostname
             weight: 100
+      {{- if .Values.serviceMonitor.tls.enabled }}
       volumes:
-      - name: {{ include "name" . }}-configmap
-        configMap:
-          name: {{ include "resource.default.name"  . }}
+      - name: metrics-certs
+        secret:
+          secretName: {{ .Values.serviceMonitor.tls.secretName }}
+          optional: false
           items:
-          - key: config.yml
-            path: config.yml
+            - key: ca.crt
+              path: ca.crt
+            - key: tls.crt
+              path: tls.crt
+            - key: tls.key
+              path: tls.key
+      {{- end }}
       serviceAccountName: {{ include "resource.default.name"  . }}
       securityContext:
         runAsUser: {{ .Values.pod.user.id }}
@@ -46,16 +53,26 @@ spec:
       - name: {{ include "name" . }}
         image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Chart.AppVersion }}"
         args:
-        - daemon
-        - --config.dirs=/var/run/{{ include "name" . }}/configmap/
-        - --config.files=config
+        - --metrics-bind-address=:{{ .Values.pod.ports.metrics }}
+        {{- if .Values.serviceMonitor.tls.enabled }}
+        - --metrics-cert-path=/tmp/k8s-metrics/metrics-certs
+        {{- if .Values.serviceMonitor.scrapeAuth.enabled }}
+        - --metrics-secure=true
+        {{- end }}
+        {{- end }}
         ports:
-        - containerPort: 8000
+        - containerPort: {{ .Values.pod.ports.http }}
           name: http
           protocol: TCP
+        - containerPort: {{ .Values.pod.ports.metrics }}
+          name: metrics
+          protocol: TCP
+        {{- if .Values.serviceMonitor.tls.enabled }}
         volumeMounts:
-        - name: {{ include "name" . }}-configmap
-          mountPath: /var/run/{{ include "name" . }}/configmap/
+        - name: metrics-certs
+          mountPath: /tmp/k8s-metrics/metrics-certs
+          readOnly: true
+        {{- end }}
         livenessProbe:
           httpGet:
             path: /healthz

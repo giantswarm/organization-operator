@@ -1,0 +1,36 @@
+{{- if and .Values.serviceMonitor.scrapeAuth.enabled .Values.serviceMonitor.scrapeAuth.createServiceAccount }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "resource.metricsServiceAccount.name"  . }}
+  namespace: {{ include "resource.default.namespace"  . }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "resource.metricsServiceAccount.name"  . }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "resource.metricsServiceAccount.name"  . }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "resource.metricsServiceAccount.name"  . }}
+    namespace: {{ include "resource.default.namespace"  . }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "resource.metricsServiceAccount.name"  . }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
