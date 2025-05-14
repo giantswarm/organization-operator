@@ -59,7 +59,9 @@ type OrganizationReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+// Reconcile handles Organization resources by creating corresponding namespaces
+// and managing their lifecycle through the controller runtime.
+func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) { //nolint:lll
 	logger := log.FromContext(ctx)
 
 	// Fetch the Organization instance
@@ -129,7 +131,7 @@ func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *OrganizationReconciler) reconcileDelete(ctx context.Context, organization *securityv1alpha1.Organization) (ctrl.Result, error) {
+func (r *OrganizationReconciler) reconcileDelete(ctx context.Context, organization *securityv1alpha1.Organization) (ctrl.Result, error) { //nolint:lll
 	log := log.FromContext(ctx)
 
 	// Use the namespace name from the organization status

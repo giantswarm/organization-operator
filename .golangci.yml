@@ -3,38 +3,30 @@ version: "2"
 linters:
   default: none
   enable:
-    - copyloopvar
-    - dupl
     - errcheck
-    - ginkgolinter
-    - goconst
-    - gocyclo
-    - gosimple
     - govet
     - ineffassign
+    - staticcheck
+    - unused
+    - dupl
+    - goconst
+    - gocyclo
     - lll
     - misspell
     - nakedret
     - prealloc
     - revive
-    - staticcheck
-    - typecheck
     - unconvert
     - unparam
-    - unused
-  settings:
-    revive:
-      rules:
-        - name: comment-spacings
-  exclusions:
+    - copyloopvar
+    - ginkgolinter
+    - gosec
+    - asciicheck
+
+linters-settings:
+  revive:
     rules:
-      - linters:
-          - lll
-        path: api/*
-      - linters:
-          - dupl
-          - lll
-        path: internal/*
+      - name: comment-spacings
 
 formatters:
   enable:
@@ -44,6 +36,14 @@ formatters:
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-rules:
+    - path: "api/*"
+      linters:
+        - lll
+    - path: "internal/*"
+      linters:
+        - dupl
+        - lll
 
 run:
   timeout: 5m
