@@ -14,6 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/*
+Copyright 2024.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package controller
 
 import (
@@ -40,8 +56,77 @@ var _ = ginkgo.Describe("Organization controller", func() {
 		interval = time.Millisecond * 250
 	)
 
+	// Helper function for testing finalizer removal
+	testFinalizerRemoval := func(ctx context.Context,
+		name string,
+		finalizer string,
+		namespaceName string,
+		errorMessage string) {
+		org := &securityv1alpha1.Organization{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       name,
+				Finalizers: []string{finalizer},
+			},
+			Spec: securityv1alpha1.OrganizationSpec{},
+			Status: securityv1alpha1.OrganizationStatus{
+				Namespace: namespaceName,
+			},
+		}
+		gomega.Expect(k8sClient.Create(ctx, org)).To(gomega.Succeed())
+
+		// Create the associated namespace
+		namespace := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespaceName,
+			},
+		}
+		gomega.Expect(k8sClient.Create(ctx, namespace)).To(gomega.Succeed())
+
+		reconciler := &OrganizationReconciler{
+			Client: k8sClient,
+			Scheme: k8sClient.Scheme(),
+		}
+
+		// Trigger deletion
+		gomega.Expect(k8sClient.Delete(ctx, org)).To(gomega.Succeed())
+
+		// Wait for the organization to be fully deleted
+		gomega.Eventually(func() error {
+			err := k8sClient.Get(ctx, client.ObjectKey{Name: name}, &securityv1alpha1.Organization{})
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			// Trigger reconciliation if the organization still exists
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: name},
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			return fmt.Errorf("%s", errorMessage)
+		}, timeout, interval).Should(gomega.Succeed())
+
+		// Verify that the namespace has been deleted
+		gomega.Eventually(func() error {
+			err := k8sClient.Get(ctx, client.ObjectKey{Name: namespaceName}, &corev1.Namespace{})
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("namespace still exists")
+		}, timeout, interval).Should(gomega.Succeed())
+
+		// Verify that the organization count metric has been updated
+		initialCount := testutil.ToFloat64(organizationsTotal)
+		gomega.Consistently(func() bool {
+			currentCount := testutil.ToFloat64(organizationsTotal)
+			return currentCount <= initialCount
+		}, timeout, interval).Should(gomega.BeTrue())
+	}
+
 	ginkgo.Context("When creating and deleting Organizations", func() {
-		ginkgo.It("Should create a corresponding Namespace, update the Organization status, and update the total organizations metric", func() {
+		ginkgo.It("Should create a corresponding Namespace, update the Organization status, "+
+			"and update the total organizations metric", func() {
 			ctx := context.Background()
 
 			ginkgo.By("Creating the first organization")
@@ -69,8 +154,12 @@ var _ = ginkgo.Describe("Organization controller", func() {
 			gomega.Eventually(func() error {
 				return k8sClient.Get(ctx, types.NamespacedName{Name: namespaceName}, createdNamespace)
 			}, timeout, interval).Should(gomega.Succeed())
-			gomega.Expect(createdNamespace.Labels).To(gomega.HaveKeyWithValue("giantswarm.io/organization", "test-1"))
-			gomega.Expect(createdNamespace.Labels).To(gomega.HaveKeyWithValue("giantswarm.io/managed-by", "organization-operator"))
+			gomega.Expect(createdNamespace.Labels).To(
+				gomega.HaveKeyWithValue("giantswarm.io/organization", "test-1"),
+			)
+			gomega.Expect(createdNamespace.Labels).To(
+				gomega.HaveKeyWithValue("giantswarm.io/managed-by", "organization-operator"),
+			)
 
 			ginkgo.By("Verifying the Organization status was updated")
 			updatedOrg := &securityv1alpha1.Organization{}
@@ -132,131 +221,26 @@ var _ = ginkgo.Describe("Organization controller", func() {
 
 		ginkgo.It("Should remove the finalizer when deleting an Organization", func() {
 			ctx := context.Background()
-			org := &securityv1alpha1.Organization{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-finalizer",
-					Finalizers: []string{"organization.giantswarm.io/finalizer"},
-				},
-				Spec: securityv1alpha1.OrganizationSpec{},
-				Status: securityv1alpha1.OrganizationStatus{
-					Namespace: "org-test-finalizer",
-				},
-			}
-			gomega.Expect(k8sClient.Create(ctx, org)).To(gomega.Succeed())
-
-			// Create the associated namespace
-			namespace := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "org-test-finalizer",
-				},
-			}
-			gomega.Expect(k8sClient.Create(ctx, namespace)).To(gomega.Succeed())
-
-			reconciler := &OrganizationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
-
-			// Trigger deletion
-			gomega.Expect(k8sClient.Delete(ctx, org)).To(gomega.Succeed())
-
-			// Wait for the organization to be fully deleted
-			gomega.Eventually(func() error {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: "test-finalizer"}, &securityv1alpha1.Organization{})
-				if errors.IsNotFound(err) {
-					return nil
-				}
-				if err != nil {
-					return err
-				}
-				// Trigger reconciliation if the organization still exists
-				_, err = reconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: types.NamespacedName{Name: "test-finalizer"},
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return fmt.Errorf("organization still exists")
-			}, timeout, interval).Should(gomega.Succeed())
-
-			// Verify that the namespace has been deleted
-			gomega.Eventually(func() error {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: "org-test-finalizer"}, &corev1.Namespace{})
-				if errors.IsNotFound(err) {
-					return nil
-				}
-				return fmt.Errorf("namespace still exists")
-			}, timeout, interval).Should(gomega.Succeed())
-
-			// Verify that the organization count metric has been updated
-			initialCount := testutil.ToFloat64(organizationsTotal)
-			gomega.Consistently(func() bool {
-				currentCount := testutil.ToFloat64(organizationsTotal)
-				return currentCount <= initialCount
-			}, timeout, interval).Should(gomega.BeTrue())
+			testFinalizerRemoval(
+				ctx,
+				"test-finalizer",
+				"organization.giantswarm.io/finalizer",
+				"org-test-finalizer",
+				"organization still exists",
+			)
 		})
 	})
+
 	ginkgo.Context("When handling Organizations with old finalizers", func() {
 		ginkgo.It("Should remove the old finalizer when deleting an Organization", func() {
 			ctx := context.Background()
-			oldFinalizerOrg := &securityv1alpha1.Organization{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-old-finalizer",
-					Finalizers: []string{"operatorkit.giantswarm.io/organization-operator-organization-controller"},
-				},
-				Spec: securityv1alpha1.OrganizationSpec{},
-				Status: securityv1alpha1.OrganizationStatus{
-					Namespace: "org-test-old-finalizer",
-				},
-			}
-			gomega.Expect(k8sClient.Create(ctx, oldFinalizerOrg)).To(gomega.Succeed())
-
-			// Create the associated namespace
-			namespace := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "org-test-old-finalizer",
-				},
-			}
-			gomega.Expect(k8sClient.Create(ctx, namespace)).To(gomega.Succeed())
-
-			reconciler := &OrganizationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
-
-			// Trigger deletion
-			gomega.Expect(k8sClient.Delete(ctx, oldFinalizerOrg)).To(gomega.Succeed())
-
-			// Wait for the organization to be fully deleted
-			gomega.Eventually(func() error {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: "test-old-finalizer"}, &securityv1alpha1.Organization{})
-				if errors.IsNotFound(err) {
-					return nil
-				}
-				if err != nil {
-					return err
-				}
-				// Trigger reconciliation if the organization still exists
-				_, err = reconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: types.NamespacedName{Name: "test-old-finalizer"},
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return fmt.Errorf("organization with old finalizer still exists")
-			}, timeout, interval).Should(gomega.Succeed())
-
-			// Verify that the namespace has been deleted
-			gomega.Eventually(func() error {
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: "org-test-old-finalizer"}, &corev1.Namespace{})
-				if errors.IsNotFound(err) {
-					return nil
-				}
-				return fmt.Errorf("namespace for organization with old finalizer still exists")
-			}, timeout, interval).Should(gomega.Succeed())
-
-			// Verify that the organization count metric has been updated
-			initialCount := testutil.ToFloat64(organizationsTotal)
-			gomega.Consistently(func() bool {
-				currentCount := testutil.ToFloat64(organizationsTotal)
-				return currentCount <= initialCount
-			}, timeout, interval).Should(gomega.BeTrue())
+			testFinalizerRemoval(
+				ctx,
+				"test-old-finalizer",
+				"operatorkit.giantswarm.io/organization-operator-organization-controller",
+				"org-test-old-finalizer",
+				"organization with old finalizer still exists",
+			)
 		})
 	})
 })
