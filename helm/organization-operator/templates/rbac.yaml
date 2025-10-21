@@ -65,6 +65,7 @@ rules:
     resources:
       - organizations
       - organizations/status
+      - organizations/finalizers
     verbs:
       - "*"
 {{- if .Values.serviceMonitor.scrapeAuth.enabled }}
