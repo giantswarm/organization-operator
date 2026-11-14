@@ -43,6 +43,7 @@ spec:
               path: tls.key
       {{- end }}
       serviceAccountName: {{ include "resource.default.name"  . }}
+      hostUsers: {{ .Values.hostUsers }}
       securityContext:
         runAsUser: {{ .Values.pod.user.id }}
         runAsGroup: {{ .Values.pod.group.id }}
