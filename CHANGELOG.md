@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update architect, split go build from OCI push, and split Aliyun push from other registries.
+- Run as uid/gid `65532`, the image's distroless `nonroot` user, instead of `1000`.
+- Run the pod in its own user namespace (`hostUsers: false`, new `hostUsers` value).
 
 ## [2.1.3] - 2026-01-30
 

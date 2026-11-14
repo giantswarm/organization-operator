@@ -1,0 +1,37 @@
+suite: pod identity and user namespace
+templates:
+  - deployment.yaml
+tests:
+  - it: runs as the image's nonroot user and group
+    # The image is distroless/static:nonroot with USER 65532:65532.
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 65532
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 65532
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
+          value: true
+
+  - it: runs in a user namespace by default
+    asserts:
+      - equal:
+          path: spec.template.spec.hostUsers
+          value: false
+
+  - it: can opt out of the user namespace
+    set:
+      hostUsers: true
+    asserts:
+      - equal:
+          path: spec.template.spec.hostUsers
+          value: true
+
+  - it: rejects a non-boolean hostUsers
+    set:
+      hostUsers: "false"
+    asserts:
+      - failedTemplate:
+          errorPattern: hostUsers

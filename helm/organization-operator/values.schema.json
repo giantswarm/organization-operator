@@ -91,6 +91,9 @@
                     "type": "string"
                 }
             }
+        },
+        "hostUsers": {
+            "type": "boolean"
         }
     }
 }
