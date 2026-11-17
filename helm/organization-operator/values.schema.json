@@ -92,6 +92,9 @@
                 }
             }
         },
+        "hostUsers": {
+            "type": "boolean"
+        },
         "architecture": {
             "type": "string",
             "enum": ["", "amd64", "arm64"]

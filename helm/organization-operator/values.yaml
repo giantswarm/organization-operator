@@ -6,12 +6,16 @@ registry:
 
 pod:
   user:
-    id: 1000
+    # -- Matches the image's `USER 65532:65532` (distroless nonroot).
+    id: 65532
   group:
-    id: 1000
+    id: 65532
   ports:
     http: 8000
     metrics: 8080
+
+# -- Run the pod in its own user namespace when `false`. Needs Kubernetes 1.33+, containerd 2.0+ and Linux 6.3+ on the node.
+hostUsers: false
 
 # Add seccomp to pod security context
 podSecurityContext:
