@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add `architecture`, `nodeSelector` and `tolerations` values so organization-operator can run on arm64 node pools.
 - `Organization` CRD: the optional `spec.agentPlatform` (`enabled`, `harnesses`, `workers.replicas`), `status.agentPlatform` and `status.conditions` let the Agent Platform keep its settings and state on the `Organization`. organization-operator ignores them and keeps them when it writes `status.namespace`.
+- `Organization` CRD: the optional `spec.admins` lists the organization's admins, each a `User` or a `Group` by name; the API server refuses another kind, an empty name, a name that starts with `system:` and a duplicate. organization-operator does not read it.
 
 ### Fixed
 

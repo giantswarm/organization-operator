@@ -22,10 +22,41 @@ import (
 
 // OrganizationSpec defines the desired state of Organization
 type OrganizationSpec struct {
+	// Admins are the Users and Groups the organization is handed over to.
+	// Each product derives its admin binding in the organization from this
+	// list. No admins means the platform team manages the organization.
+	// organization-operator does not read it.
+	// +optional
+	// +listType=map
+	// +listMapKey=kind
+	// +listMapKey=name
+	Admins []OrganizationAdmin `json:"admins,omitempty"`
+
 	// AgentPlatform is the organization's share of the installation's Agent
 	// Platform. organization-operator does not read it.
 	// +optional
 	AgentPlatform *AgentPlatformSpec `json:"agentPlatform,omitempty"`
+}
+
+// Kinds of an organization admin (spec.admins[].kind). They are the RBAC
+// subject kinds of the same names.
+const (
+	OrganizationAdminUser  = "User"
+	OrganizationAdminGroup = "Group"
+)
+
+// OrganizationAdmin is one admin of the organization: a User or a Group, by
+// the name the API server authenticates it with. A ServiceAccount is not an
+// admin, and neither is a name of the API server's own identities (system:).
+type OrganizationAdmin struct {
+	// Kind is User or Group.
+	// +kubebuilder:validation:Enum=User;Group
+	Kind string `json:"kind"`
+
+	// Name is the user's or the group's name.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="!self.startsWith('system:')",message="a system: name is not an admin"
+	Name string `json:"name"`
 }
 
 // AgentPlatformSpec is what the organization gets on the Agent Platform.
