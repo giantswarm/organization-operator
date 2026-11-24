@@ -81,7 +81,9 @@ func (w AgentPlatformWorkers) ReplicasOrDefault() int32 {
 // OrganizationStatus defines the observed state of Organization. More than
 // one controller writes it: organization-operator writes Namespace, the Agent
 // Platform's operator writes AgentPlatform. Each writer patches its own
-// fields and keeps the others.
+// fields and keeps the others. A JSON merge patch replaces the whole
+// Conditions list, so a writer of Conditions uses server-side apply with a
+// field manager of its own, or a patch with an optimistic lock.
 type OrganizationStatus struct {
 	// Namespace is the namespace containing the resources for this organization.
 	Namespace string `json:"namespace,omitempty"`
@@ -112,8 +114,8 @@ const (
 // AgentPlatformStatus is what the Agent Platform's operator observed for the
 // organization.
 type AgentPlatformStatus struct {
-	// Namespace is the namespace the Agent Platform keeps for the
-	// organization: agents-<name>.
+	// Namespace is the namespace the Agent Platform's operator created for
+	// the organization. Read it from here; do not derive it from the name.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 

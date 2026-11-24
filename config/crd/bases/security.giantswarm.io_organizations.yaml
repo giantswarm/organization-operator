@@ -98,7 +98,9 @@ spec:
               OrganizationStatus defines the observed state of Organization. More than
               one controller writes it: organization-operator writes Namespace, the Agent
               Platform's operator writes AgentPlatform. Each writer patches its own
-              fields and keeps the others.
+              fields and keeps the others. A JSON merge patch replaces the whole
+              Conditions list, so a writer of Conditions uses server-side apply with a
+              field manager of its own, or a patch with an optimistic lock.
             properties:
               agentPlatform:
                 description: |-
@@ -128,8 +130,8 @@ spec:
                     type: string
                   namespace:
                     description: |-
-                      Namespace is the namespace the Agent Platform keeps for the
-                      organization: agents-<name>.
+                      Namespace is the namespace the Agent Platform's operator created for
+                      the organization. Read it from here; do not derive it from the name.
                     type: string
                   snapshotPrefix:
                     description: |-
