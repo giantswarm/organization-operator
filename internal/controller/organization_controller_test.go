@@ -44,7 +44,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	securityv1alpha1 "github.com/giantswarm/organization-operator/api/v1alpha1"
@@ -228,6 +230,56 @@ var _ = ginkgo.Describe("Organization controller", func() {
 				"org-test-finalizer",
 				"organization still exists",
 			)
+		})
+	})
+
+	ginkgo.Context("When another controller writes the Organization's status", func() {
+		ginkgo.It("Should keep the other writer's status fields and the Agent Platform spec", func() {
+			ctx := context.Background()
+			const name = "shared"
+
+			agentPlatformSpec := &securityv1alpha1.AgentPlatformSpec{
+				Enabled:   true,
+				Harnesses: []string{"claude-code"},
+			}
+			agentPlatformStatus := &securityv1alpha1.AgentPlatformStatus{
+				Namespace:      "agents-shared",
+				SnapshotPrefix: "s3://snapshots/shared",
+			}
+			conditions := []metav1.Condition{{
+				Type:               "Ready",
+				Status:             metav1.ConditionTrue,
+				Reason:             "Reconciled",
+				LastTransitionTime: metav1.Now().Rfc3339Copy(),
+			}}
+			org := &securityv1alpha1.Organization{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec:       securityv1alpha1.OrganizationSpec{AgentPlatform: agentPlatformSpec},
+				Status: securityv1alpha1.OrganizationStatus{
+					AgentPlatform: agentPlatformStatus,
+					Conditions:    conditions,
+				},
+			}
+			// A client of its own, so the organization count of the other
+			// specs does not see this organization.
+			c := fake.NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithStatusSubresource(&securityv1alpha1.Organization{}).
+				WithObjects(org).
+				Build()
+			reconciler := &OrganizationReconciler{Client: c, Scheme: c.Scheme()}
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: name},
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			got := &securityv1alpha1.Organization{}
+			gomega.Expect(c.Get(ctx, client.ObjectKey{Name: name}, got)).To(gomega.Succeed())
+			gomega.Expect(got.Status.Namespace).To(gomega.Equal("org-shared"))
+			gomega.Expect(got.Status.AgentPlatform).To(gomega.Equal(agentPlatformStatus))
+			gomega.Expect(got.Status.Conditions).To(gomega.Equal(conditions))
+			gomega.Expect(got.Spec.AgentPlatform).To(gomega.Equal(agentPlatformSpec))
 		})
 	})
 
