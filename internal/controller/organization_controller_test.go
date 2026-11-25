@@ -278,7 +278,10 @@ var _ = ginkgo.Describe("Organization controller", func() {
 			gomega.Expect(c.Get(ctx, client.ObjectKey{Name: name}, got)).To(gomega.Succeed())
 			gomega.Expect(got.Status.Namespace).To(gomega.Equal("org-shared"))
 			gomega.Expect(got.Status.AgentPlatform).To(gomega.Equal(agentPlatformStatus))
-			gomega.Expect(got.Status.Conditions).To(gomega.Equal(conditions))
+			// BeComparableTo compares times with time.Time.Equal: the round
+			// trip through JSON gives the time the Local location, which
+			// reflect.DeepEqual sees as a difference when TZ is UTC.
+			gomega.Expect(got.Status.Conditions).To(gomega.BeComparableTo(conditions))
 			gomega.Expect(got.Spec.AgentPlatform).To(gomega.Equal(agentPlatformSpec))
 		})
 	})
