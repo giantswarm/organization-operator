@@ -47,6 +47,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	securityv1alpha1 "github.com/giantswarm/organization-operator/api/v1alpha1"
@@ -283,6 +285,60 @@ var _ = ginkgo.Describe("Organization controller", func() {
 			// reflect.DeepEqual sees as a difference when TZ is UTC.
 			gomega.Expect(got.Status.Conditions).To(gomega.BeComparableTo(conditions))
 			gomega.Expect(got.Spec.AgentPlatform).To(gomega.Equal(agentPlatformSpec))
+		})
+	})
+
+	ginkgo.Context("When another controller adds its finalizer after the reconciler read the Organization", func() {
+		ginkgo.It("Should keep the other controller's finalizer", func() {
+			ctx := context.Background()
+			const (
+				name           = "racing"
+				otherFinalizer = "agent-platform.giantswarm.io/erasure"
+			)
+
+			otherWrote := false
+			c := fake.NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithStatusSubresource(&securityv1alpha1.Organization{}).
+				WithObjects(&securityv1alpha1.Organization{ObjectMeta: metav1.ObjectMeta{Name: name}}).
+				WithInterceptorFuncs(interceptor.Funcs{
+					// After the reconciler's first read, the other controller
+					// adds its finalizer: the reconciler's copy is stale.
+					Get: func(ctx context.Context, inner client.WithWatch, key client.ObjectKey,
+						obj client.Object, opts ...client.GetOption) error {
+						if err := inner.Get(ctx, key, obj, opts...); err != nil {
+							return err
+						}
+						if _, ok := obj.(*securityv1alpha1.Organization); !ok || otherWrote {
+							return nil
+						}
+						otherWrote = true
+						current := &securityv1alpha1.Organization{}
+						if err := inner.Get(ctx, key, current); err != nil {
+							return err
+						}
+						controllerutil.AddFinalizer(current, otherFinalizer)
+						return inner.Update(ctx, current)
+					},
+				}).
+				Build()
+			reconciler := &OrganizationReconciler{Client: c, Scheme: c.Scheme()}
+			req := reconcile.Request{NamespacedName: types.NamespacedName{Name: name}}
+
+			_, err := reconciler.Reconcile(ctx, req)
+			gomega.Expect(errors.IsConflict(err)).To(gomega.BeTrue(), "got error %v", err)
+
+			got := &securityv1alpha1.Organization{}
+			gomega.Expect(c.Get(ctx, client.ObjectKey{Name: name}, got)).To(gomega.Succeed())
+			gomega.Expect(got.Finalizers).To(gomega.ConsistOf(otherFinalizer))
+
+			// controller-runtime requeues on the error; the next reconcile
+			// reads the current copy.
+			_, err = reconciler.Reconcile(ctx, req)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Expect(c.Get(ctx, client.ObjectKey{Name: name}, got)).To(gomega.Succeed())
+			gomega.Expect(got.Finalizers).To(gomega.ConsistOf(otherFinalizer, newFinalizer))
 		})
 	})
 

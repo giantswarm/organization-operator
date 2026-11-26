@@ -75,9 +75,12 @@ func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.reconcileDelete(ctx, organization)
 	}
 
-	// Add finalizer if it doesn't exist
+	// Add finalizer if it doesn't exist. A merge patch sends the whole
+	// finalizer list, so a patch from a stale copy would remove a finalizer
+	// that another controller added since. The optimistic lock makes the API
+	// server refuse such a patch with a conflict; the error requeues.
 	if !controllerutil.ContainsFinalizer(organization, newFinalizer) {
-		patch := client.MergeFrom(organization.DeepCopy())
+		patch := client.MergeFromWithOptions(organization.DeepCopy(), client.MergeFromWithOptimisticLock{})
 		controllerutil.AddFinalizer(organization, newFinalizer)
 		if err := r.Patch(ctx, organization, patch); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to add finalizer: %w", err)
