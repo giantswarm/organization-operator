@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-26
+
+### Added
+
+- Add `architecture`, `nodeSelector` and `tolerations` values so organization-operator can run on arm64 node pools.
+- `Organization` CRD: the optional `spec.capabilities.agentPlatform` (`enabled`, `harnesses`, `workers.replicas`), `status.capabilities.agentPlatform` (`snapshotPrefix`, `lastAppliedRevision`) and `status.conditions` (the Agent Platform's types start with `AgentPlatform`) let the Agent Platform keep its settings and state on the `Organization`. organization-operator ignores them and keeps them when it writes its status.
+- `Organization` CRD: `status.namespaces` lists the organization's namespaces, one for each capability (`name`, `capability`). organization-operator writes its `kaas` entry, the namespace of `status.namespace`, with server-side apply and keeps the entries of other writers. With an older CRD, organization-operator still writes `status.namespace`, and it tries the `kaas` entry again until the CRD has `status.namespaces`.
+- `Organization` CRD: the optional `spec.admins` lists the organization's admins, each a `User` or a `Group` by name; the API server refuses another kind, an empty name, a name that starts with `system:` and a duplicate. organization-operator does not read it.
+
+### Changed
+
+- This release aggregates all changes from release candidate 2.2.0-rc.1.
+- Update architect, split go build from OCI push, and split Aliyun push from other registries.
+- Run as uid/gid `65532`, the image's distroless `nonroot` user, instead of `1000`.
+- Run the pod in its own user namespace (`hostUsers: false`, new `hostUsers` value).
+
+### Fixed
+
+- The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
+- When organization-operator adds its finalizer to an `Organization`, it no longer removes a finalizer that another controller added at the same time: a write from an old copy fails with a conflict and is tried again.
+
 ## [2.2.0-rc.1] - 2026-11-26
 
 ### Added
@@ -313,7 +334,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release.
 
-[Unreleased]: https://github.com/giantswarm/organization-operator/compare/v2.2.0-rc.1...HEAD
+[Unreleased]: https://github.com/giantswarm/organization-operator/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/giantswarm/organization-operator/compare/v2.2.0-rc.1...v2.2.0
 [2.2.0-rc.1]: https://github.com/giantswarm/organization-operator/compare/v2.1.3...v2.2.0-rc.1
 [2.1.3]: https://github.com/giantswarm/organization-operator/compare/v2.1.2...v2.1.3
 [2.1.2]: https://github.com/giantswarm/organization-operator/compare/v2.1.1...v2.1.2
