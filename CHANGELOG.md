@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0-rc.1] - 2026-11-26
+
 ### Added
 
 - Add `architecture`, `nodeSelector` and `tolerations` values so organization-operator can run on arm64 node pools.
@@ -311,7 +313,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release.
 
-[Unreleased]: https://github.com/giantswarm/organization-operator/compare/v2.1.3...HEAD
+[Unreleased]: https://github.com/giantswarm/organization-operator/compare/v2.2.0-rc.1...HEAD
+[2.2.0-rc.1]: https://github.com/giantswarm/organization-operator/compare/v2.1.3...v2.2.0-rc.1
 [2.1.3]: https://github.com/giantswarm/organization-operator/compare/v2.1.2...v2.1.3
 [2.1.2]: https://github.com/giantswarm/organization-operator/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/giantswarm/organization-operator/compare/v2.1.0...v2.1.1
