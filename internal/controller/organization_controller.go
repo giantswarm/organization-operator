@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,6 +39,9 @@ import (
 const (
 	oldFinalizer = "operatorkit.giantswarm.io/organization-operator-organization-controller"
 	newFinalizer = "organization.giantswarm.io/finalizer"
+
+	// fieldManager owns the status fields that organization-operator applies.
+	fieldManager = "organization-operator"
 )
 
 var (
@@ -75,9 +79,12 @@ func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.reconcileDelete(ctx, organization)
 	}
 
-	// Add finalizer if it doesn't exist
+	// Add finalizer if it doesn't exist. A merge patch sends the whole
+	// finalizer list, so a patch from a stale copy would remove a finalizer
+	// that another controller added since. The optimistic lock makes the API
+	// server refuse such a patch with a conflict; the error requeues.
 	if !controllerutil.ContainsFinalizer(organization, newFinalizer) {
-		patch := client.MergeFrom(organization.DeepCopy())
+		patch := client.MergeFromWithOptions(organization.DeepCopy(), client.MergeFromWithOptimisticLock{})
 		controllerutil.AddFinalizer(organization, newFinalizer)
 		if err := r.Patch(ctx, organization, patch); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to add finalizer: %w", err)
@@ -121,6 +128,13 @@ func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err := r.Status().Patch(ctx, organization, patch); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to update Organization status: %w", err)
 		}
+	}
+
+	// A write of its own, after status.namespace: a CRD older than this
+	// operator does not have status.namespaces, and the API server refuses an
+	// apply of it until the CRD is updated.
+	if err := r.applyKaaSNamespace(ctx, organization.Name, namespaceName); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to write the kaas namespace to the Organization status: %w", err)
 	}
 
 	if err := r.updateOrganizationCount(ctx); err != nil {
@@ -184,6 +198,27 @@ func (r *OrganizationReconciler) reconcileDelete(ctx context.Context, organizati
 
 	log.Info("Organization successfully deleted")
 	return ctrl.Result{}, nil
+}
+
+// applyKaaSNamespace writes the kaas entry of status.namespaces with
+// server-side apply, as the field manager organization-operator. The API
+// server merges the entry into status.namespaces by its capability key
+// (listType=map), so the entries of other writers stay. A JSON merge patch
+// would replace the whole list.
+func (r *OrganizationReconciler) applyKaaSNamespace(ctx context.Context, organizationName, namespaceName string) error {
+	status := &unstructured.Unstructured{}
+	status.SetGroupVersionKind(securityv1alpha1.GroupVersion.WithKind("Organization"))
+	status.SetName(organizationName)
+	status.Object["status"] = map[string]interface{}{
+		"namespaces": []interface{}{
+			map[string]interface{}{
+				"name":       namespaceName,
+				"capability": securityv1alpha1.CapabilityKaaS,
+			},
+		},
+	}
+	return r.Status().Apply(ctx, client.ApplyConfigurationFromUnstructured(status),
+		client.FieldOwner(fieldManager), client.ForceOwnership)
 }
 
 func (r *OrganizationReconciler) updateOrganizationCount(ctx context.Context) error {

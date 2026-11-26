@@ -10,10 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add `architecture`, `nodeSelector` and `tolerations` values so organization-operator can run on arm64 node pools.
+- `Organization` CRD: the optional `spec.capabilities.agentPlatform` (`enabled`, `harnesses`, `workers.replicas`), `status.capabilities.agentPlatform` (`snapshotPrefix`, `lastAppliedRevision`) and `status.conditions` (the Agent Platform's types start with `AgentPlatform`) let the Agent Platform keep its settings and state on the `Organization`. organization-operator ignores them and keeps them when it writes its status.
+- `Organization` CRD: `status.namespaces` lists the organization's namespaces, one for each capability (`name`, `capability`). organization-operator writes its `kaas` entry, the namespace of `status.namespace`, with server-side apply and keeps the entries of other writers. With an older CRD, organization-operator still writes `status.namespace`, and it tries the `kaas` entry again until the CRD has `status.namespaces`.
+- `Organization` CRD: the optional `spec.admins` lists the organization's admins, each a `User` or a `Group` by name; the API server refuses another kind, an empty name, a name that starts with `system:` and a duplicate. organization-operator does not read it.
 
 ### Fixed
 
 - The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
+- When organization-operator adds its finalizer to an `Organization`, it no longer removes a finalizer that another controller added at the same time: a write from an old copy fails with a conflict and is tried again.
 
 ### Changed
 

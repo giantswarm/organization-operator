@@ -43,8 +43,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	securityv1alpha1 "github.com/giantswarm/organization-operator/api/v1alpha1"
@@ -170,6 +174,10 @@ var _ = ginkgo.Describe("Organization controller", func() {
 				}
 				return updatedOrg.Status.Namespace
 			}, timeout, interval).Should(gomega.Equal(namespaceName))
+			gomega.Expect(updatedOrg.Status.Namespaces).To(gomega.ConsistOf(securityv1alpha1.OrganizationNamespace{
+				Name:       namespaceName,
+				Capability: securityv1alpha1.CapabilityKaaS,
+			}))
 
 			ginkgo.By("Verifying the total organizations metric is 1")
 			gomega.Eventually(func() float64 {
@@ -228,6 +236,159 @@ var _ = ginkgo.Describe("Organization controller", func() {
 				"org-test-finalizer",
 				"organization still exists",
 			)
+		})
+	})
+
+	ginkgo.Context("When another controller writes the Organization's status", func() {
+		ginkgo.It("Should add its kaas namespace and keep the other writer's namespace, status and spec", func() {
+			ctx := context.Background()
+			const name = "shared"
+
+			agentPlatformSpec := &securityv1alpha1.AgentPlatformSpec{
+				Enabled:   true,
+				Harnesses: []string{"claude-code"},
+			}
+			agentPlatformNamespace := securityv1alpha1.OrganizationNamespace{
+				Name:       "agents-shared",
+				Capability: securityv1alpha1.CapabilityAgentPlatform,
+			}
+			agentPlatformStatus := &securityv1alpha1.AgentPlatformStatus{
+				SnapshotPrefix:      "s3://snapshots/shared",
+				LastAppliedRevision: "main@sha1:4fb1b22",
+			}
+			conditions := []metav1.Condition{{
+				Type:               securityv1alpha1.AgentPlatformReady,
+				Status:             metav1.ConditionTrue,
+				Reason:             "Reconciled",
+				LastTransitionTime: metav1.Now().Rfc3339Copy(),
+			}}
+			// A client of its own, so the organization count of the other
+			// specs does not see this organization.
+			c := newClientBuilder().
+				WithObjects(&securityv1alpha1.Organization{
+					ObjectMeta: metav1.ObjectMeta{Name: name},
+					Spec: securityv1alpha1.OrganizationSpec{
+						Capabilities: securityv1alpha1.OrganizationCapabilities{AgentPlatform: agentPlatformSpec},
+					},
+				}).
+				Build()
+
+			// The Agent Platform's operator applies its status with a field
+			// manager of its own.
+			otherStatus, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&securityv1alpha1.OrganizationStatus{
+				Namespaces: []securityv1alpha1.OrganizationNamespace{agentPlatformNamespace},
+				Capabilities: securityv1alpha1.OrganizationCapabilitiesStatus{
+					AgentPlatform: agentPlatformStatus,
+				},
+				Conditions: conditions,
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			other := &unstructured.Unstructured{Object: map[string]interface{}{"status": otherStatus}}
+			other.SetGroupVersionKind(securityv1alpha1.GroupVersion.WithKind("Organization"))
+			other.SetName(name)
+			gomega.Expect(c.Status().Apply(ctx, client.ApplyConfigurationFromUnstructured(other),
+				client.FieldOwner("agent-platform-operator"))).To(gomega.Succeed())
+
+			reconciler := &OrganizationReconciler{Client: c, Scheme: c.Scheme()}
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: name},
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			got := &securityv1alpha1.Organization{}
+			gomega.Expect(c.Get(ctx, client.ObjectKey{Name: name}, got)).To(gomega.Succeed())
+			gomega.Expect(got.Status.Namespace).To(gomega.Equal("org-shared"))
+			gomega.Expect(got.Status.Namespaces).To(gomega.ConsistOf(
+				agentPlatformNamespace,
+				securityv1alpha1.OrganizationNamespace{Name: "org-shared", Capability: securityv1alpha1.CapabilityKaaS},
+			))
+			gomega.Expect(got.Status.Capabilities.AgentPlatform).To(gomega.Equal(agentPlatformStatus))
+			// BeComparableTo compares times with time.Time.Equal: the round
+			// trip through JSON gives the time the Local location, which
+			// reflect.DeepEqual sees as a difference when TZ is UTC.
+			gomega.Expect(got.Status.Conditions).To(gomega.BeComparableTo(conditions))
+			gomega.Expect(got.Spec.Capabilities.AgentPlatform).To(gomega.Equal(agentPlatformSpec))
+		})
+	})
+
+	ginkgo.Context("When the installed CRD does not have status.namespaces yet", func() {
+		ginkgo.It("Should still write status.namespace", func() {
+			ctx := context.Background()
+			const name = "older-crd"
+
+			// The CRD of an earlier release: the API server refuses a
+			// server-side apply of a field that the CRD does not know.
+			crd, err := loadCRD()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			delete(crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["status"].Properties, "namespaces")
+			converters, err := typeConvertersFor(crd)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			c := clientBuilderFor(converters).
+				WithObjects(&securityv1alpha1.Organization{ObjectMeta: metav1.ObjectMeta{Name: name}}).
+				Build()
+			reconciler := &OrganizationReconciler{Client: c, Scheme: c.Scheme()}
+
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: name},
+			})
+			// The kaas entry waits for the CRD; controller-runtime retries.
+			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("field not declared in schema")))
+
+			got := &securityv1alpha1.Organization{}
+			gomega.Expect(c.Get(ctx, client.ObjectKey{Name: name}, got)).To(gomega.Succeed())
+			gomega.Expect(got.Status.Namespace).To(gomega.Equal("org-older-crd"))
+		})
+	})
+
+	ginkgo.Context("When another controller adds its finalizer after the reconciler read the Organization", func() {
+		ginkgo.It("Should keep the other controller's finalizer", func() {
+			ctx := context.Background()
+			const (
+				name           = "racing"
+				otherFinalizer = "agent-platform.giantswarm.io/erasure"
+			)
+
+			otherWrote := false
+			c := newClientBuilder().
+				WithObjects(&securityv1alpha1.Organization{ObjectMeta: metav1.ObjectMeta{Name: name}}).
+				WithInterceptorFuncs(interceptor.Funcs{
+					// After the reconciler's first read, the other controller
+					// adds its finalizer: the reconciler's copy is stale.
+					Get: func(ctx context.Context, inner client.WithWatch, key client.ObjectKey,
+						obj client.Object, opts ...client.GetOption) error {
+						if err := inner.Get(ctx, key, obj, opts...); err != nil {
+							return err
+						}
+						if _, ok := obj.(*securityv1alpha1.Organization); !ok || otherWrote {
+							return nil
+						}
+						otherWrote = true
+						current := &securityv1alpha1.Organization{}
+						if err := inner.Get(ctx, key, current); err != nil {
+							return err
+						}
+						controllerutil.AddFinalizer(current, otherFinalizer)
+						return inner.Update(ctx, current)
+					},
+				}).
+				Build()
+			reconciler := &OrganizationReconciler{Client: c, Scheme: c.Scheme()}
+			req := reconcile.Request{NamespacedName: types.NamespacedName{Name: name}}
+
+			_, err := reconciler.Reconcile(ctx, req)
+			gomega.Expect(errors.IsConflict(err)).To(gomega.BeTrue(), "got error %v", err)
+
+			got := &securityv1alpha1.Organization{}
+			gomega.Expect(c.Get(ctx, client.ObjectKey{Name: name}, got)).To(gomega.Succeed())
+			gomega.Expect(got.Finalizers).To(gomega.ConsistOf(otherFinalizer))
+
+			// controller-runtime requeues on the error; the next reconcile
+			// reads the current copy.
+			_, err = reconciler.Reconcile(ctx, req)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Expect(c.Get(ctx, client.ObjectKey{Name: name}, got)).To(gomega.Succeed())
+			gomega.Expect(got.Finalizers).To(gomega.ConsistOf(otherFinalizer, newFinalizer))
 		})
 	})
 
