@@ -32,11 +32,31 @@ type OrganizationSpec struct {
 	// +listMapKey=name
 	Admins []OrganizationAdmin `json:"admins,omitempty"`
 
+	// Capabilities are the settings of the platform capabilities the
+	// organization gets, one field for each capability.
+	// +optional
+	Capabilities OrganizationCapabilities `json:"capabilities,omitzero"`
+}
+
+// OrganizationCapabilities are the settings of the platform capabilities the
+// organization gets. The operator of each capability reads its own field.
+type OrganizationCapabilities struct {
 	// AgentPlatform is the organization's share of the installation's Agent
 	// Platform. organization-operator does not read it.
 	// +optional
 	AgentPlatform *AgentPlatformSpec `json:"agentPlatform,omitempty"`
 }
+
+// Capabilities that give an organization a namespace
+// (status.namespaces[].capability).
+const (
+	// CapabilityKaaS is the organization's namespace org-<name>, which
+	// organization-operator creates.
+	CapabilityKaaS = "kaas"
+	// CapabilityAgentPlatform is the organization's namespace on the Agent
+	// Platform, which the Agent Platform's operator creates.
+	CapabilityAgentPlatform = "agentPlatform"
+)
 
 // Kinds of an organization admin (spec.admins[].kind). They are the RBAC
 // subject kinds of the same names.
@@ -78,7 +98,8 @@ type AgentPlatformSpec struct {
 }
 
 // DefaultAgentPlatformWorkerReplicas is the number of warm workers of an
-// organization whose spec.agentPlatform.workers.replicas is not set.
+// organization whose spec.capabilities.agentPlatform.workers.replicas is not
+// set.
 const DefaultAgentPlatformWorkerReplicas int32 = 1
 
 // AgentPlatformWorkers sizes the organization's WorkerPool.
@@ -110,63 +131,109 @@ func (w AgentPlatformWorkers) ReplicasOrDefault() int32 {
 }
 
 // OrganizationStatus defines the observed state of Organization. More than
-// one controller writes it: organization-operator writes Namespace, the Agent
-// Platform's operator writes AgentPlatform. Each writer patches its own
-// fields and keeps the others. A JSON merge patch replaces the whole
-// Conditions list, so a writer of Conditions uses server-side apply with a
-// field manager of its own, or a patch with an optimistic lock.
+// one controller writes it: organization-operator writes Namespace and its
+// kaas entry of Namespaces, the Agent Platform's operator writes its
+// agentPlatform entry of Namespaces, Capabilities.AgentPlatform and its
+// AgentPlatform conditions. Each writer writes its own fields and entries and
+// keeps the others. A JSON merge patch replaces a whole list, so a writer of
+// Namespaces or Conditions uses server-side apply with a field manager of its
+// own, or a patch with an optimistic lock.
 type OrganizationStatus struct {
 	// Namespace is the namespace containing the resources for this organization.
 	Namespace string `json:"namespace,omitempty"`
 
-	// AgentPlatform is what the Agent Platform's operator observed for the
-	// organization. organization-operator does not write it.
+	// Namespaces are the organization's namespaces, one for each capability
+	// that gives the organization a namespace. The operator of each
+	// capability writes its own entry: the kaas entry is Namespace. Read a
+	// capability's namespace from here; do not derive it from the name.
 	// +optional
-	AgentPlatform *AgentPlatformStatus `json:"agentPlatform,omitempty"`
+	// +listType=map
+	// +listMapKey=capability
+	Namespaces []OrganizationNamespace `json:"namespaces,omitempty"`
+
+	// Capabilities are what the operator of each capability observed for the
+	// organization, one field for each capability.
+	// +optional
+	Capabilities OrganizationCapabilitiesStatus `json:"capabilities,omitzero"`
 
 	// Conditions are the conditions of every controller that reconciles the
-	// organization, one for each type.
+	// organization, one for each type. The type of a capability's condition
+	// starts with the capability's name, for example AgentPlatformReady.
 	// +optional
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// Erasure steps of an organization whose Agent Platform is erased, in order
-// (status.agentPlatform.erasureStep).
+// OrganizationNamespace is a namespace of the organization and the capability
+// it belongs to.
+type OrganizationNamespace struct {
+	// Name is the namespace's name.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// Capability is the capability that the namespace belongs to, for example
+	// kaas or agentPlatform.
+	// +kubebuilder:validation:MinLength=1
+	Capability string `json:"capability"`
+}
+
+// OrganizationCapabilitiesStatus are what the operator of each capability
+// observed for the organization.
+type OrganizationCapabilitiesStatus struct {
+	// AgentPlatform is what the Agent Platform's operator observed for the
+	// organization. organization-operator does not write it.
+	// +optional
+	AgentPlatform *AgentPlatformStatus `json:"agentPlatform,omitempty"`
+}
+
+// Condition types of the Agent Platform (status.conditions[].type). The Agent
+// Platform's operator writes them.
 const (
-	AgentPlatformErasureWorkloads      = "Workloads"
-	AgentPlatformErasureSessions       = "Sessions"
-	AgentPlatformErasureSnapshots      = "Snapshots"
-	AgentPlatformErasureNamespace      = "Namespace"
-	AgentPlatformErasureOutsideObjects = "OutsideObjects"
+	// AgentPlatformReady is True when the organization's Agent Platform
+	// namespace holds every object the operator keeps there.
+	AgentPlatformReady = "AgentPlatformReady"
+	// AgentPlatformOrphaned is True when the organization carries the
+	// installation Kustomization's ownership labels but is missing from that
+	// Kustomization's inventory. Its reasons are AgentPlatformOrphaned*.
+	AgentPlatformOrphaned = "AgentPlatformOrphaned"
+	// AgentPlatformDefaultModelConfigured is False while the organization's
+	// Agent Platform namespace holds no default ModelConfig.
+	AgentPlatformDefaultModelConfigured = "AgentPlatformDefaultModelConfigured"
+	// AgentPlatformErasing is True while the operator erases the
+	// organization's Agent Platform. Its reason is the erasure step,
+	// AgentPlatformErasing*.
+	AgentPlatformErasing = "AgentPlatformErasing"
+	// AgentPlatformSnapshotsErased is True from the operator's first delete of
+	// the organization's snapshot prefix; its lastTransitionTime is the time
+	// of that delete.
+	AgentPlatformSnapshotsErased = "AgentPlatformSnapshotsErased"
+)
+
+// Reasons of the AgentPlatformOrphaned condition.
+const (
+	AgentPlatformOrphanedInInventory    = "InInventory"
+	AgentPlatformOrphanedMissingFromGit = "MissingFromGit"
+	AgentPlatformOrphanedDeleteMerged   = "DeleteMerged"
+)
+
+// Reasons of the AgentPlatformErasing condition: the erasure steps, in order.
+const (
+	AgentPlatformErasingWorkloads      = "Workloads"
+	AgentPlatformErasingSessions       = "Sessions"
+	AgentPlatformErasingSnapshots      = "Snapshots"
+	AgentPlatformErasingNamespace      = "Namespace"
+	AgentPlatformErasingOutsideObjects = "OutsideObjects"
 )
 
 // AgentPlatformStatus is what the Agent Platform's operator observed for the
 // organization.
 type AgentPlatformStatus struct {
-	// Namespace is the namespace the Agent Platform's operator created for
-	// the organization. Read it from here; do not derive it from the name.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-
 	// SnapshotPrefix is where the organization's worker snapshots live,
-	// s3://<bucket>/<uid>. Empty when the operator has no snapshot bucket.
+	// s3://<bucket>/<uid>. The erasure deletes the prefix recorded here. Empty
+	// when the operator has no snapshot bucket.
 	// +optional
 	SnapshotPrefix string `json:"snapshotPrefix,omitempty"`
-
-	// ErasureStep is the erasure step the operator is on once the
-	// organization's Agent Platform is erased: Workloads, Sessions, Snapshots,
-	// Namespace or OutsideObjects. Empty while it is not erased.
-	// +optional
-	// +kubebuilder:validation:Enum=Workloads;Sessions;Snapshots;Namespace;OutsideObjects
-	ErasureStep string `json:"erasureStep,omitempty"`
-
-	// SnapshotsErasedAt is when the operator first emptied the snapshot
-	// prefix of the erased organization; it empties it once more after the
-	// snapshot erase delay.
-	// +optional
-	SnapshotsErasedAt *metav1.MicroTime `json:"snapshotsErasedAt,omitempty"`
 
 	// LastAppliedRevision is the last source revision the installation
 	// Kustomization applied the organization from (e.g. <branch>@sha1:<sha>

@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,6 +39,9 @@ import (
 const (
 	oldFinalizer = "operatorkit.giantswarm.io/organization-operator-organization-controller"
 	newFinalizer = "organization.giantswarm.io/finalizer"
+
+	// fieldManager owns the status fields that organization-operator applies.
+	fieldManager = "organization-operator"
 )
 
 var (
@@ -117,13 +121,8 @@ func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	logger.Info("Namespace reconciled", "result", operationResult)
 
-	// Update Organization status
-	if organization.Status.Namespace != namespaceName {
-		patch := client.MergeFrom(organization.DeepCopy())
-		organization.Status.Namespace = namespaceName
-		if err := r.Status().Patch(ctx, organization, patch); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to update Organization status: %w", err)
-		}
+	if err := r.applyNamespaceStatus(ctx, organization, namespaceName); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to update Organization status: %w", err)
 	}
 
 	if err := r.updateOrganizationCount(ctx); err != nil {
@@ -187,6 +186,28 @@ func (r *OrganizationReconciler) reconcileDelete(ctx context.Context, organizati
 
 	log.Info("Organization successfully deleted")
 	return ctrl.Result{}, nil
+}
+
+// applyNamespaceStatus writes status.namespace and the kaas entry of
+// status.namespaces with server-side apply, as the field manager
+// organization-operator. The API server merges the kaas entry into
+// status.namespaces by its capability key (listType=map), so the entries of
+// other writers stay. A JSON merge patch would replace the whole list.
+func (r *OrganizationReconciler) applyNamespaceStatus(ctx context.Context, organization *securityv1alpha1.Organization, namespaceName string) error { //nolint:lll
+	status := &unstructured.Unstructured{}
+	status.SetGroupVersionKind(securityv1alpha1.GroupVersion.WithKind("Organization"))
+	status.SetName(organization.Name)
+	status.Object["status"] = map[string]interface{}{
+		"namespace": namespaceName,
+		"namespaces": []interface{}{
+			map[string]interface{}{
+				"name":       namespaceName,
+				"capability": securityv1alpha1.CapabilityKaaS,
+			},
+		},
+	}
+	return r.Status().Apply(ctx, client.ApplyConfigurationFromUnstructured(status),
+		client.FieldOwner(fieldManager), client.ForceOwnership)
 }
 
 func (r *OrganizationReconciler) updateOrganizationCount(ctx context.Context) error {

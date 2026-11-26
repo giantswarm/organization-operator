@@ -15,24 +15,68 @@ limitations under the License.
 package controller
 
 import (
+	"os"
 	"testing"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	clientgoapplyconfigurations "k8s.io/client-go/applyconfigurations"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/yaml"
 
 	securityv1alpha1 "github.com/giantswarm/organization-operator/api/v1alpha1"
 )
 
-var k8sClient client.Client
+const crdPath = "../../config/crd/bases/security.giantswarm.io_organizations.yaml"
+
+var (
+	k8sClient client.Client
+
+	// typeConverters let the fake client's server-side apply merge the
+	// lists of an Organization by the list types of the generated CRD, as
+	// the API server does. Its default converter takes every list of a
+	// custom resource as atomic.
+	typeConverters []managedfields.TypeConverter
+)
 
 func TestAPIs(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(t, "Controller Suite")
+}
+
+// newClientBuilder starts a fake client that serves the Organization's status
+// subresource and applies by the generated CRD's schema.
+func newClientBuilder() *fake.ClientBuilder {
+	return fake.NewClientBuilder().
+		WithScheme(scheme.Scheme).
+		WithStatusSubresource(&securityv1alpha1.Organization{}).
+		WithTypeConverters(typeConverters...)
+}
+
+// organizationTypeConverter builds the type converter of the generated CRD
+// the way the API server builds it for a custom resource.
+func organizationTypeConverter() (managedfields.TypeConverter, error) {
+	raw, err := os.ReadFile(crdPath)
+	if err != nil {
+		return nil, err
+	}
+	crd := &apiextensionsv1.CustomResourceDefinition{}
+	if err := yaml.UnmarshalStrict(raw, crd); err != nil {
+		return nil, err
+	}
+	openAPI, err := builder.BuildOpenAPIV3(crd, crd.Spec.Versions[0].Name, builder.Options{})
+	if err != nil {
+		return nil, err
+	}
+	return managedfields.NewTypeConverter(openAPI.Components.Schemas, false)
 }
 
 var _ = ginkgo.BeforeSuite(func() {
@@ -43,9 +87,18 @@ var _ = ginkgo.BeforeSuite(func() {
 	err := securityv1alpha1.AddToScheme(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	k8sClient = fake.NewClientBuilder().
-		WithScheme(scheme.Scheme).
-		WithStatusSubresource(&securityv1alpha1.Organization{}).
-		Build()
+	// The client-go converter knows the built-in kinds, such as Namespace,
+	// and refuses the others; a scheme of the built-in kinds alone keeps it
+	// from claiming the Organization.
+	builtInScheme := runtime.NewScheme()
+	gomega.Expect(scheme.AddToScheme(builtInScheme)).To(gomega.Succeed())
+	organizationConverter, err := organizationTypeConverter()
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	typeConverters = []managedfields.TypeConverter{
+		clientgoapplyconfigurations.NewTypeConverter(builtInScheme),
+		organizationConverter,
+	}
+
+	k8sClient = newClientBuilder().Build()
 	gomega.Expect(k8sClient).NotTo(gomega.BeNil())
 })

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -116,6 +117,10 @@ func TestOrganizationCRDAdmission(t *testing.T) {
 		// wantErrorPath is the field the API server refuses; empty when it
 		// admits the object.
 		wantErrorPath string
+		// wantDropped are the fields the API server does not know: it drops
+		// them, and refuses the object when the writer asks for strict field
+		// validation (kubectl's default).
+		wantDropped []string
 		// wantSpec is the spec the API server stores, after its defaults.
 		wantSpec string
 	}{
@@ -136,9 +141,11 @@ apiVersion: security.giantswarm.io/v1alpha1
 kind: Organization
 metadata: {name: acme}
 spec:
-  agentPlatform: {enabled: true, harnesses: [claude-code, codex]}
+  capabilities:
+    agentPlatform: {enabled: true, harnesses: [claude-code, codex]}
 `,
-			wantSpec: `{"agentPlatform":{"enabled":true,"harnesses":["claude-code","codex"],"workers":{"replicas":1}}}`,
+			wantSpec: `{"capabilities":{"agentPlatform":` +
+				`{"enabled":true,"harnesses":["claude-code","codex"],"workers":{"replicas":1}}}}`,
 		},
 		{
 			name: "zero replicas set on purpose stay zero",
@@ -147,9 +154,10 @@ apiVersion: security.giantswarm.io/v1alpha1
 kind: Organization
 metadata: {name: acme}
 spec:
-  agentPlatform: {enabled: true, workers: {replicas: 0}}
+  capabilities:
+    agentPlatform: {enabled: true, workers: {replicas: 0}}
 `,
-			wantSpec: `{"agentPlatform":{"enabled":true,"workers":{"replicas":0}}}`,
+			wantSpec: `{"capabilities":{"agentPlatform":{"enabled":true,"workers":{"replicas":0}}}}`,
 		},
 		{
 			name: "negative replicas are refused",
@@ -158,9 +166,10 @@ apiVersion: security.giantswarm.io/v1alpha1
 kind: Organization
 metadata: {name: acme}
 spec:
-  agentPlatform: {enabled: true, workers: {replicas: -1}}
+  capabilities:
+    agentPlatform: {enabled: true, workers: {replicas: -1}}
 `,
-			wantErrorPath: "spec.agentPlatform.workers.replicas",
+			wantErrorPath: "spec.capabilities.agentPlatform.workers.replicas",
 		},
 		{
 			name: "a harness named twice is refused",
@@ -169,9 +178,24 @@ apiVersion: security.giantswarm.io/v1alpha1
 kind: Organization
 metadata: {name: acme}
 spec:
-  agentPlatform: {enabled: true, harnesses: [claude-code, claude-code]}
+  capabilities:
+    agentPlatform: {enabled: true, harnesses: [claude-code, claude-code]}
 `,
-			wantErrorPath: "spec.agentPlatform.harnesses[1]",
+			wantErrorPath: "spec.capabilities.agentPlatform.harnesses[1]",
+		},
+		{
+			name: "the Agent Platform fields outside capabilities are not part of the schema",
+			doc: `
+apiVersion: security.giantswarm.io/v1alpha1
+kind: Organization
+metadata: {name: acme}
+spec:
+  agentPlatform: {enabled: true}
+status:
+  agentPlatform: {namespace: agents-acme}
+`,
+			wantDropped: []string{"spec.agentPlatform", "status.agentPlatform"},
+			wantSpec:    `{}`,
 		},
 		{
 			name: "users and groups are admins, and a user and a group may share a name",
@@ -241,16 +265,44 @@ spec:
 			wantErrorPath: "spec.admins[1]",
 		},
 		{
-			name: "an unknown erasure step is refused",
+			name: "a namespace without a capability is refused",
 			doc: `
 apiVersion: security.giantswarm.io/v1alpha1
 kind: Organization
 metadata: {name: acme}
 spec: {}
 status:
-  agentPlatform: {erasureStep: Everything}
+  namespaces:
+  - {name: org-acme}
 `,
-			wantErrorPath: "status.agentPlatform.erasureStep",
+			wantErrorPath: "status.namespaces[0].capability",
+		},
+		{
+			name: "a namespace without a name is refused",
+			doc: `
+apiVersion: security.giantswarm.io/v1alpha1
+kind: Organization
+metadata: {name: acme}
+spec: {}
+status:
+  namespaces:
+  - {capability: kaas}
+`,
+			wantErrorPath: "status.namespaces[0].name",
+		},
+		{
+			name: "two namespaces of one capability are refused",
+			doc: `
+apiVersion: security.giantswarm.io/v1alpha1
+kind: Organization
+metadata: {name: acme}
+spec: {}
+status:
+  namespaces:
+  - {name: agents-acme, capability: agentPlatform}
+  - {name: agents-acme-2, capability: agentPlatform}
+`,
+			wantErrorPath: "status.namespaces[1]",
 		},
 		{
 			name: "two conditions of one type are refused",
@@ -272,7 +324,7 @@ status:
 		t.Run(tc.name, func(t *testing.T) {
 			obj := organizationFromYAML(t, tc.doc)
 
-			_, errs := schema.admit(obj)
+			dropped, errs := schema.admit(obj)
 
 			if tc.wantErrorPath != "" {
 				for _, err := range errs {
@@ -284,6 +336,10 @@ status:
 			}
 			if len(errs) > 0 {
 				t.Fatalf("want the object admitted, got %v", errs)
+			}
+			slices.Sort(dropped)
+			if !slices.Equal(dropped, tc.wantDropped) {
+				t.Fatalf("dropped fields are %v, want %v", dropped, tc.wantDropped)
 			}
 			gotSpec, err := json.Marshal(obj["spec"])
 			if err != nil {
@@ -302,7 +358,6 @@ status:
 func TestOrganizationCRDKeepsEveryGoField(t *testing.T) {
 	schema := loadCRDSchema(t)
 
-	erasedAt := metav1.NewMicroTime(metav1.Now().Rfc3339Copy().Time)
 	org := securityv1alpha1.Organization{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "security.giantswarm.io/v1alpha1", Kind: "Organization"},
 		ObjectMeta: metav1.ObjectMeta{Name: "acme"},
@@ -311,25 +366,30 @@ func TestOrganizationCRDKeepsEveryGoField(t *testing.T) {
 				{Kind: securityv1alpha1.OrganizationAdminGroup, Name: "acme-admins"},
 				{Kind: securityv1alpha1.OrganizationAdminUser, Name: "alice@example.com"},
 			},
-			AgentPlatform: &securityv1alpha1.AgentPlatformSpec{
-				Enabled:   true,
-				Harnesses: []string{"claude-code"},
-				Workers:   securityv1alpha1.AgentPlatformWorkers{Replicas: ptr.To[int32](2)},
+			Capabilities: securityv1alpha1.OrganizationCapabilities{
+				AgentPlatform: &securityv1alpha1.AgentPlatformSpec{
+					Enabled:   true,
+					Harnesses: []string{"claude-code"},
+					Workers:   securityv1alpha1.AgentPlatformWorkers{Replicas: ptr.To[int32](2)},
+				},
 			},
 		},
 		Status: securityv1alpha1.OrganizationStatus{
 			Namespace: "org-acme",
-			AgentPlatform: &securityv1alpha1.AgentPlatformStatus{
-				Namespace:           "agents-acme",
-				SnapshotPrefix:      "s3://snapshots/0b6f",
-				ErasureStep:         securityv1alpha1.AgentPlatformErasureSnapshots,
-				SnapshotsErasedAt:   &erasedAt,
-				LastAppliedRevision: "main@sha1:4fb1b22",
+			Namespaces: []securityv1alpha1.OrganizationNamespace{
+				{Name: "org-acme", Capability: securityv1alpha1.CapabilityKaaS},
+				{Name: "agents-acme", Capability: securityv1alpha1.CapabilityAgentPlatform},
+			},
+			Capabilities: securityv1alpha1.OrganizationCapabilitiesStatus{
+				AgentPlatform: &securityv1alpha1.AgentPlatformStatus{
+					SnapshotPrefix:      "s3://snapshots/0b6f",
+					LastAppliedRevision: "main@sha1:4fb1b22",
+				},
 			},
 			Conditions: []metav1.Condition{{
-				Type:               "Ready",
+				Type:               securityv1alpha1.AgentPlatformErasing,
 				Status:             metav1.ConditionTrue,
-				Reason:             "Reconciled",
+				Reason:             securityv1alpha1.AgentPlatformErasingSnapshots,
 				LastTransitionTime: metav1.Now().Rfc3339Copy(),
 			}},
 		},
