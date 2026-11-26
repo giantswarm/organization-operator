@@ -311,6 +311,35 @@ var _ = ginkgo.Describe("Organization controller", func() {
 		})
 	})
 
+	ginkgo.Context("When the installed CRD does not have status.namespaces yet", func() {
+		ginkgo.It("Should still write status.namespace", func() {
+			ctx := context.Background()
+			const name = "older-crd"
+
+			// The CRD of an earlier release: the API server refuses a
+			// server-side apply of a field that the CRD does not know.
+			crd, err := loadCRD()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			delete(crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["status"].Properties, "namespaces")
+			converters, err := typeConvertersFor(crd)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			c := clientBuilderFor(converters).
+				WithObjects(&securityv1alpha1.Organization{ObjectMeta: metav1.ObjectMeta{Name: name}}).
+				Build()
+			reconciler := &OrganizationReconciler{Client: c, Scheme: c.Scheme()}
+
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: name},
+			})
+			// The kaas entry waits for the CRD; controller-runtime retries.
+			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("field not declared in schema")))
+
+			got := &securityv1alpha1.Organization{}
+			gomega.Expect(c.Get(ctx, client.ObjectKey{Name: name}, got)).To(gomega.Succeed())
+			gomega.Expect(got.Status.Namespace).To(gomega.Equal("org-older-crd"))
+		})
+	})
+
 	ginkgo.Context("When another controller adds its finalizer after the reconciler read the Organization", func() {
 		ginkgo.It("Should keep the other controller's finalizer", func() {
 			ctx := context.Background()

@@ -108,9 +108,10 @@ type AgentPlatformWorkers struct {
 	// while the organization uses them: while its namespace holds a
 	// ModelConfig and an Agent (a curated copy counts), or a ModelConfig and
 	// a session. The pool runs 0 while the namespace holds no ModelConfig,
-	// while it holds no Agent and no session, and while the organization is
-	// Orphaned. A deleted organization runs Replicas until its sessions are
-	// gone, so kagent can suspend its actors, and 0 after.
+	// while it holds no Agent and no session, and while the organization's
+	// AgentPlatformOrphaned condition is True. A deleted organization runs
+	// Replicas until its sessions are gone, so kagent can suspend its actors,
+	// and 0 after.
 	//
 	// Not set means 1; 0 set on purpose runs no worker.
 	// +optional
@@ -158,7 +159,8 @@ type OrganizationStatus struct {
 
 	// Conditions are the conditions of every controller that reconciles the
 	// organization, one for each type. The type of a capability's condition
-	// starts with the capability's name, for example AgentPlatformReady.
+	// starts with the capability's name in upper camel case, for example
+	// AgentPlatformReady.
 	// +optional
 	// +listType=map
 	// +listMapKey=type
@@ -239,8 +241,8 @@ type AgentPlatformStatus struct {
 	// Kustomization applied the organization from (e.g. <branch>@sha1:<sha>
 	// for a GitRepository): that Kustomization's status.lastAppliedRevision
 	// while the organization is in its settled inventory. It is kept while the
-	// organization is Orphaned, so a removed file can be found in that
-	// revision. Empty when no such revision was recorded.
+	// organization's AgentPlatformOrphaned condition is True, so a removed file
+	// can be found in that revision. Empty when no such revision was recorded.
 	// +optional
 	LastAppliedRevision string `json:"lastAppliedRevision,omitempty"`
 }

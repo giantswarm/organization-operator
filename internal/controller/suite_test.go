@@ -55,15 +55,20 @@ func TestAPIs(t *testing.T) {
 // newClientBuilder starts a fake client that serves the Organization's status
 // subresource and applies by the generated CRD's schema.
 func newClientBuilder() *fake.ClientBuilder {
+	return clientBuilderFor(typeConverters)
+}
+
+// clientBuilderFor starts a fake client that serves the Organization's status
+// subresource and applies by the given type converters.
+func clientBuilderFor(converters []managedfields.TypeConverter) *fake.ClientBuilder {
 	return fake.NewClientBuilder().
 		WithScheme(scheme.Scheme).
 		WithStatusSubresource(&securityv1alpha1.Organization{}).
-		WithTypeConverters(typeConverters...)
+		WithTypeConverters(converters...)
 }
 
-// organizationTypeConverter builds the type converter of the generated CRD
-// the way the API server builds it for a custom resource.
-func organizationTypeConverter() (managedfields.TypeConverter, error) {
+// loadCRD reads the generated CRD.
+func loadCRD() (*apiextensionsv1.CustomResourceDefinition, error) {
 	raw, err := os.ReadFile(crdPath)
 	if err != nil {
 		return nil, err
@@ -72,11 +77,32 @@ func organizationTypeConverter() (managedfields.TypeConverter, error) {
 	if err := yaml.UnmarshalStrict(raw, crd); err != nil {
 		return nil, err
 	}
+	return crd, nil
+}
+
+// typeConvertersFor are the type converters of the built-in kinds and of the
+// Organization by the given CRD, built the way the API server builds the
+// converter of a custom resource.
+func typeConvertersFor(crd *apiextensionsv1.CustomResourceDefinition) ([]managedfields.TypeConverter, error) {
 	openAPI, err := builder.BuildOpenAPIV3(crd, crd.Spec.Versions[0].Name, builder.Options{})
 	if err != nil {
 		return nil, err
 	}
-	return managedfields.NewTypeConverter(openAPI.Components.Schemas, false)
+	organizationConverter, err := managedfields.NewTypeConverter(openAPI.Components.Schemas, false)
+	if err != nil {
+		return nil, err
+	}
+	// The client-go converter knows the built-in kinds, such as Namespace,
+	// and refuses the others; a scheme of the built-in kinds alone keeps it
+	// from claiming the Organization.
+	builtInScheme := runtime.NewScheme()
+	if err := scheme.AddToScheme(builtInScheme); err != nil {
+		return nil, err
+	}
+	return []managedfields.TypeConverter{
+		clientgoapplyconfigurations.NewTypeConverter(builtInScheme),
+		organizationConverter,
+	}, nil
 }
 
 var _ = ginkgo.BeforeSuite(func() {
@@ -87,17 +113,10 @@ var _ = ginkgo.BeforeSuite(func() {
 	err := securityv1alpha1.AddToScheme(scheme.Scheme)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	// The client-go converter knows the built-in kinds, such as Namespace,
-	// and refuses the others; a scheme of the built-in kinds alone keeps it
-	// from claiming the Organization.
-	builtInScheme := runtime.NewScheme()
-	gomega.Expect(scheme.AddToScheme(builtInScheme)).To(gomega.Succeed())
-	organizationConverter, err := organizationTypeConverter()
+	crd, err := loadCRD()
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	typeConverters = []managedfields.TypeConverter{
-		clientgoapplyconfigurations.NewTypeConverter(builtInScheme),
-		organizationConverter,
-	}
+	typeConverters, err = typeConvertersFor(crd)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	k8sClient = newClientBuilder().Build()
 	gomega.Expect(k8sClient).NotTo(gomega.BeNil())

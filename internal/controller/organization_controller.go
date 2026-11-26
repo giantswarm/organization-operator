@@ -121,8 +121,20 @@ func (r *OrganizationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	logger.Info("Namespace reconciled", "result", operationResult)
 
-	if err := r.applyNamespaceStatus(ctx, organization, namespaceName); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to update Organization status: %w", err)
+	// Update Organization status
+	if organization.Status.Namespace != namespaceName {
+		patch := client.MergeFrom(organization.DeepCopy())
+		organization.Status.Namespace = namespaceName
+		if err := r.Status().Patch(ctx, organization, patch); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to update Organization status: %w", err)
+		}
+	}
+
+	// A write of its own, after status.namespace: a CRD older than this
+	// operator does not have status.namespaces, and the API server refuses an
+	// apply of it until the CRD is updated.
+	if err := r.applyKaaSNamespace(ctx, organization.Name, namespaceName); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to write the kaas namespace to the Organization status: %w", err)
 	}
 
 	if err := r.updateOrganizationCount(ctx); err != nil {
@@ -188,17 +200,16 @@ func (r *OrganizationReconciler) reconcileDelete(ctx context.Context, organizati
 	return ctrl.Result{}, nil
 }
 
-// applyNamespaceStatus writes status.namespace and the kaas entry of
-// status.namespaces with server-side apply, as the field manager
-// organization-operator. The API server merges the kaas entry into
-// status.namespaces by its capability key (listType=map), so the entries of
-// other writers stay. A JSON merge patch would replace the whole list.
-func (r *OrganizationReconciler) applyNamespaceStatus(ctx context.Context, organization *securityv1alpha1.Organization, namespaceName string) error { //nolint:lll
+// applyKaaSNamespace writes the kaas entry of status.namespaces with
+// server-side apply, as the field manager organization-operator. The API
+// server merges the entry into status.namespaces by its capability key
+// (listType=map), so the entries of other writers stay. A JSON merge patch
+// would replace the whole list.
+func (r *OrganizationReconciler) applyKaaSNamespace(ctx context.Context, organizationName, namespaceName string) error {
 	status := &unstructured.Unstructured{}
 	status.SetGroupVersionKind(securityv1alpha1.GroupVersion.WithKind("Organization"))
-	status.SetName(organization.Name)
+	status.SetName(organizationName)
 	status.Object["status"] = map[string]interface{}{
-		"namespace": namespaceName,
 		"namespaces": []interface{}{
 			map[string]interface{}{
 				"name":       namespaceName,
